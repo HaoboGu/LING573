@@ -4,7 +4,7 @@
     The output requirement can be found on Canvas.
 
     Author: Haobo Gu
-    Data created: 04/14/2018
+    Date created: 04/14/2018
 """
 import os
 
@@ -40,12 +40,12 @@ class Writer:
         Topic_id should end with A or B, which is the docset_indicator.
         :return: output_filename, end with team number
         """
-        docset_indicator = self.topic_id[-1]
+        suffix = self.topic_id[-1]
         # Check the docset indicator
-        if docset_indicator == "A" or "B":
+        if suffix == "A" or "B":
             id_part1 = self.topic_id[:-1]
         else:
             print("docset_indicator should be either A and B")
 
         # our team number is 1
-        return id_part1 + "-A.M.100." + docset_indicator + '.1'
+        return id_part1 + "-A.M.100." + suffix + '.1'
