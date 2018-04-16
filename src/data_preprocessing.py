@@ -219,4 +219,4 @@ if __name__ == "__main__":
     aqua = sys.argv[2]
     aqua2 = sys.argv[3]
     human_judge = sys.argv[4]
-    fullCorpus = generate_corpus(training_corpus, aqua, aqua2, human_judge)
+    fullCorpus = generate_corpus(training_corpus_file, aqua, aqua2, human_judge)
