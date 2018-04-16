@@ -133,7 +133,17 @@ def generate_a_path(dir1, dir2, doc_id):
         flag = False
     return file_path, flag
 
+def update_dictionary(docset_dict, doc_dict):
+    # this function updates the docset_dict using entries from doc_dict
+    # or the corpus dict from the docset_dict
+    for word in doc_dict:
+        if word in docset_dict:
+            docset_dict[word] += doc_dict[word]
+        else:
+            docset_dict[word] = doc_dict[word]
+
 def fill_in_corpus_data(fullCorpus, dir1, dir2):
+    # This function fill in the information of the corpus
     for docSet in fullCorpus._docsetList: # iterate through all document sets
         for doc in docSet._documentCluster: # iterate through all documents
             doc_id = doc._idCode
@@ -158,14 +168,30 @@ def fill_in_corpus_data(fullCorpus, dir1, dir2):
                             new_sent = sentence(doc_id, sent.strip(), index, 0)
                             index += 1
                             doc._sentences.append(new_sent) # append the sentence to the data structure
+                            word_tokens = nltk.tokenize.word_tokenize(sent)
+                            for word in word_tokens: # store the word count in the dictionary
+                                if word in doc._tokenDict:
+                                    doc._tokenDict[hash(word)] += 1
+                                else:
+                                    doc._tokenDict[hash(word)] = 1
                         break
                     else:
                         index = 0
-                        for para in text_all.iter(tag='P'):
+                        for para in text_all.iter(tag='P'): # documents having <p> tag
                             new_sent = sentence(doc_id, para.text.strip(), index, 0)
                             index += 1
                             doc._sentences.append(new_sent)
+                            word_tokens = nltk.tokenize.word_tokenize(para.text.strip())
+                            for word in word_tokens: # store the word count in the dictionary
+                                if word in doc._tokenDict:
+                                    doc._tokenDict[hash(word)] += 1
+                                else:
+                                    doc._tokenDict[hash(word)] = 1
                         break
+            if flag == False:
+                os.remove(doc_path)
+            update_dictionary(docSet._tokenDict, doc._tokenDict)
+        update_dictionary(fullCorpus._tokenDict, docSet._tokenDict)
     return fullCorpus
 
 def read_human_judgements(fullCorpus, dir):
@@ -181,12 +207,16 @@ def read_human_judgements(fullCorpus, dir):
                     docSet._humanSummary.append(data)
     return fullCorpus
 
+def generate_corpus(corpus_file, aqua, aqua2, human_judge):
+    # generate the corpus
+    fullCorpus = generate_corpus_from_xml(corpus_file)
+    fullCorpus = read_human_judgements(fullCorpus, human_judge)
+    fullCorpus = fill_in_corpus_data(fullCorpus, aqua, aqua2)
+    return fullCorpus
+
 if __name__ == "__main__":
     training_corpus_file = sys.argv[1]
     aqua = sys.argv[2]
     aqua2 = sys.argv[3]
     human_judge = sys.argv[4]
-
-    training_corpus = generate_corpus_from_xml(training_corpus_file)
-    training_corpus = read_human_judgements(training_corpus, human_judge)
-    training_corpus = fill_in_corpus_data(training_corpus, aqua, aqua2)
+    fullCorpus = generate_corpus(training_corpus, aqua, aqua2, human_judge)
