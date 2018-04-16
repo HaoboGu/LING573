@@ -91,6 +91,7 @@ def generate_corpus_from_xml(xml_file):
                 new_doc = document(doc_id, "", [], {}, topic_id) # create a new doc
                 new_docset._documentCluster.append(new_doc) # append the new doc to the docset's documentCluster member
             fullCorpus._docsetList.append(new_docset) # append the docset to the corpus' docsetList member
+        """
         for docSetB in topic.iter(tag='docsetB'):
             docset_B_id = docSetB.attrib["id"]
             new_docset = docSet(docset_B_id, [], [], {})
@@ -99,6 +100,7 @@ def generate_corpus_from_xml(xml_file):
                 new_doc = document(doc_id, "", [], {}, topic_id)
                 new_docset._documentCluster.append(new_doc)
             fullCorpus._docsetList.append(new_docset)
+        """
     return fullCorpus
 
 def generate_a_path(dir1, dir2, doc_id):
@@ -109,6 +111,7 @@ def generate_a_path(dir1, dir2, doc_id):
         file_id = doc_id_split[2].split('.') # find the file id
         file_name = first_dir_name+'_'+file_id[0][:-2]+'.xml' # generate the file name
         file_path = os.path.join(dir2, first_dir_name, file_name)
+        flag = True
     else:
         first_dir_name = doc_id[0:3] # find the first directory
         year = doc_id[3:7] # find the year
@@ -127,14 +130,14 @@ def generate_a_path(dir1, dir2, doc_id):
                     modified.write(re.sub(r"&[A-Za-z0-9]+;", "", line)) # replace special tokens with space
                 modified.write("</root>")
         file_path = file_name+'_new'
-    return file_path
+        flag = False
+    return file_path, flag
 
 def fill_in_corpus_data(fullCorpus, dir1, dir2):
-    i = 0
     for docSet in fullCorpus._docsetList: # iterate through all document sets
         for doc in docSet._documentCluster: # iterate through all documents
             doc_id = doc._idCode
-            doc_path = generate_a_path(dir1, dir2, doc_id)
+            doc_path, flag = generate_a_path(dir1, dir2, doc_id)
             tree = ET.ElementTree(file=doc_path)
             for sub_doc in tree.iter(tag='DOC'): # iterate through all sub-document in the doc
                 docno = sub_doc.find('DOCNO') # find the corresponding doc id
@@ -163,13 +166,27 @@ def fill_in_corpus_data(fullCorpus, dir1, dir2):
                             index += 1
                             doc._sentences.append(new_sent)
                         break
-            i += 1
-            print('finish '+str(i)+' documents')
+    return fullCorpus
+
+def read_human_judgements(fullCorpus, dir):
+    # This function fills human judgements to the corpus
+    for docSet in fullCorpus._docsetList:
+        docset_id = docSet._idCode
+        for file in os.listdir(dir):
+            correct_name = docset_id[0:5]+'-'+docset_id[-1]+'.M.100.'+docset_id[5]
+            if file[0:-2] == correct_name:
+                file_path = os.path.join(dir, file)
+                with open(file_path, 'rb') as f:
+                    data = f.read()
+                    docSet._humanSummary.append(data)
     return fullCorpus
 
 if __name__ == "__main__":
     training_corpus_file = sys.argv[1]
     aqua = sys.argv[2]
     aqua2 = sys.argv[3]
+    human_judge = sys.argv[4]
+
     training_corpus = generate_corpus_from_xml(training_corpus_file)
-    new_corpus = fill_in_corpus_data(training_corpus, aqua, aqua2)
+    training_corpus = read_human_judgements(training_corpus, human_judge)
+    training_corpus = fill_in_corpus_data(training_corpus, aqua, aqua2)
