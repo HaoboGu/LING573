@@ -16,11 +16,12 @@ class corpus:
         return self._tokenDict
 
 class docSet:
-    def __init__(self, idCode, documentCluster, humanSummary, tokenDict):
+    def __init__(self, idCode, documentCluster, humanSummary, tokenDict, topicID):
         self._idCode = idCode
         self._documentCluster = documentCluster
         self._humanSummary = humanSummary
         self._tokenDict = tokenDict
+        self._topicID = topicID
 
     def idCode(self):
         return self._idCode
@@ -33,6 +34,9 @@ class docSet:
 
     def tokenDict(self):
         return self._tokenDict
+
+    def topicID(self):
+        return self._topicID
 
 class document:
     def __init__(self, idCode, content, sentences, tokenDict, topicID):
@@ -58,11 +62,12 @@ class document:
         return self._tokenDict
 
 class sentence:
-    def __init__(self, idCode, content, index, score):
+    def __init__(self, idCode, content, index, score, length):
         self._idCode = idCode
         self._content = content
         self._index = index
         self._score = score
+        self._length = length
 
     def idCode(self):
         return self._idCode
@@ -76,6 +81,9 @@ class sentence:
     def score(self):
         return self._score
 
+    def length(self):
+        return self._length
+
 def generate_corpus_from_xml(xml_file):
 # This function generates a corpus skeleton from the xml file for training/devtest/evaltest
 # This function reads in a xml file and returns a corpus type
@@ -85,7 +93,7 @@ def generate_corpus_from_xml(xml_file):
         topic_id = topic.attrib["id"]
         for docSetA in topic.iter(tag='docsetA'): # iter through all docsetA
             docset_A_id = docSetA.attrib["id"]
-            new_docset = docSet(docset_A_id, [], [], {}) # create a new docset
+            new_docset = docSet(docset_A_id, [], [], {}, topic_id) # create a new docset
             for doc in docSetA.iter(tag='doc'): # iter through all docs
                 doc_id = doc.attrib["id"]
                 new_doc = document(doc_id, "", [], {}, topic_id) # create a new doc
@@ -94,7 +102,7 @@ def generate_corpus_from_xml(xml_file):
         """
         for docSetB in topic.iter(tag='docsetB'):
             docset_B_id = docSetB.attrib["id"]
-            new_docset = docSet(docset_B_id, [], [], {})
+            new_docset = docSet(docset_B_id, [], [], {}, topic_id)
             for doc in docSetB.iter(tag='doc'):
                 doc_id = doc.attrib["id"]
                 new_doc = document(doc_id, "", [], {}, topic_id)
@@ -165,7 +173,7 @@ def fill_in_corpus_data(fullCorpus, dir1, dir2):
                         index = 0
                         sentences = nltk.tokenize.sent_tokenize(text_all.text) # sent_tokenize the whole text
                         for sent in sentences:
-                            new_sent = sentence(doc_id, sent.strip(), index, 0)
+                            new_sent = sentence(doc_id, sent.strip(), index, 0, len(new_sent))
                             index += 1
                             doc._sentences.append(new_sent) # append the sentence to the data structure
                             word_tokens = nltk.tokenize.word_tokenize(sent)
@@ -178,7 +186,7 @@ def fill_in_corpus_data(fullCorpus, dir1, dir2):
                     else:
                         index = 0
                         for para in text_all.iter(tag='P'): # documents having <p> tag
-                            new_sent = sentence(doc_id, para.text.strip(), index, 0)
+                            new_sent = sentence(doc_id, para.text.strip(), index, 0, len(new_sent))
                             index += 1
                             doc._sentences.append(new_sent)
                             word_tokens = nltk.tokenize.word_tokenize(para.text.strip())
