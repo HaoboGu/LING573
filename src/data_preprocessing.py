@@ -136,9 +136,9 @@ def generate_a_path(dir1, dir2, doc_id):
             file_name = year+date+'_'+'XIN'+'_ENG' # add the _ENG extension and change XIN
         else:
             file_name = year+date+'_'+first_dir_name
-        ori_file_path = os.path.join(dir1, first_dir_name.lower(), year, file_name)
+        ori_file_path = os.path.join(dir1, first_dir_name.lower(), year, file_name) # update the file path for the original file
         with open(ori_file_path, 'rt') as f:
-            with open(file_name+'_new', 'wt') as modified:
+            with open(file_name+'_new', 'wt') as modified: # create a new file for reading
                 modified.write("<root>\n")
                 for line in f:
                     modified.write(re.sub(r"&[A-Za-z0-9]+;", "", line)) # replace special tokens with space
@@ -151,10 +151,10 @@ def update_dictionary(docset_dict, doc_dict):
     # this function updates the docset_dict using entries from doc_dict
     # or the corpus dict from the docset_dict
     for word in doc_dict:
-        if word in docset_dict:
-            docset_dict[word] += doc_dict[word]
+        if word in docset_dict: # if the word exists in the main dictionary
+            docset_dict[word] += doc_dict[word] # add the count together
         else:
-            docset_dict[word] = doc_dict[word]
+            docset_dict[word] = doc_dict[word] # set the count
 
 def fill_in_corpus_data(fullCorpus, dir1, dir2):
     # This function fill in the information of the corpus
@@ -162,7 +162,7 @@ def fill_in_corpus_data(fullCorpus, dir1, dir2):
         for doc in docSet._documentCluster: # iterate through all documents
             doc_id = doc._idCode
             doc_path, flag = generate_a_path(dir1, dir2, doc_id)
-            tree = ET.ElementTree(file=doc_path)
+            tree = ET.ElementTree(file=doc_path) # read the xml file as an elemen tree
             for sub_doc in tree.iter(tag='DOC'): # iterate through all sub-document in the doc
                 docno = sub_doc.find('DOCNO') # find the corresponding doc id
                 if docno == None:
@@ -179,7 +179,7 @@ def fill_in_corpus_data(fullCorpus, dir1, dir2):
                         index = 0
                         sentences = nltk.tokenize.sent_tokenize(text_all.text) # sent_tokenize the whole text
                         for sent in sentences:
-                            new_sent = sentence(doc_id, sent.strip(), index, 0, len(new_sent))
+                            new_sent = sentence(doc_id, sent.strip(), index, 0, len(sent.strip()))
                             index += 1
                             doc._sentences.append(new_sent) # append the sentence to the data structure
                             word_tokens = nltk.tokenize.word_tokenize(sent)
@@ -192,7 +192,7 @@ def fill_in_corpus_data(fullCorpus, dir1, dir2):
                     else:
                         index = 0
                         for para in text_all.iter(tag='P'): # documents having <p> tag
-                            new_sent = sentence(doc_id, para.text.strip(), index, 0, len(new_sent))
+                            new_sent = sentence(doc_id, para.text.strip(), index, 0, len(para.text.strip()))
                             index += 1
                             doc._sentences.append(new_sent)
                             word_tokens = nltk.tokenize.word_tokenize(para.text.strip())
@@ -202,30 +202,30 @@ def fill_in_corpus_data(fullCorpus, dir1, dir2):
                                 else:
                                     doc._tokenDict[hash(word)] = 1
                         break
-            if flag == False:
-                os.remove(doc_path)
-            update_dictionary(docSet._tokenDict, doc._tokenDict)
-        update_dictionary(fullCorpus._tokenDict, docSet._tokenDict)
+            if flag == False: # if a new file is created
+                os.remove(doc_path) # remove the file to release the space
+            update_dictionary(docSet._tokenDict, doc._tokenDict) # update the dictionary for the document set
+        update_dictionary(fullCorpus._tokenDict, docSet._tokenDict) # update the dictionary for the corpus
     return fullCorpus
 
 def read_human_judgements(fullCorpus, dir):
     # This function fills human judgements to the corpus
     for docSet in fullCorpus._docsetList:
-        docset_id = docSet._idCode
+        docset_id = docSet._idCode # id for the document set
         for file in os.listdir(dir):
-            correct_name = docset_id[0:5]+'-'+docset_id[-1]+'.M.100.'+docset_id[5]
-            if file[0:-2] == correct_name:
+            correct_name = docset_id[0:5]+'-'+docset_id[-1]+'.M.100.'+docset_id[5] # the name for the human judgement file
+            if file[0:-2] == correct_name: 
                 file_path = os.path.join(dir, file)
                 with open(file_path, 'rb') as f:
                     data = f.read()
-                    docSet._humanSummary.append(data)
+                    docSet._humanSummary.append(data) # load the human summary to the document set
     return fullCorpus
 
 def generate_corpus(corpus_file, aqua, aqua2, human_judge):
     # generate the corpus
-    fullCorpus = generate_corpus_from_xml(corpus_file)
-    fullCorpus = read_human_judgements(fullCorpus, human_judge)
-    fullCorpus = fill_in_corpus_data(fullCorpus, aqua, aqua2)
+    fullCorpus = generate_corpus_from_xml(corpus_file) # fill in all the essential information, create the corpus
+    fullCorpus = read_human_judgements(fullCorpus, human_judge) # fill in the human judgements
+    fullCorpus = fill_in_corpus_data(fullCorpus, aqua, aqua2) # fill in the data from two datasets
     return fullCorpus
 
 if __name__ == "__main__":
