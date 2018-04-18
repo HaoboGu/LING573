@@ -39,12 +39,13 @@ class docSet:
         return self._topicID
 
 class document:
-    def __init__(self, idCode, content, sentences, tokenDict, topicID):
+    def __init__(self, idCode, content, sentences, tokenDict, topicID, time):
         self._idCode = idCode
         self._content = content
         self._sentences = sentences
         self._topicID = topicID
         self._tokenDict = tokenDict
+        self._time = time
 
     def idCode(self):
         return self._idCode
@@ -60,6 +61,9 @@ class document:
 
     def tokenDict(self):
         return self._tokenDict
+
+    def time(self):
+        return self._time
 
 class sentence:
     def __init__(self, idCode, content, index, score, length):
@@ -96,7 +100,8 @@ def generate_corpus_from_xml(xml_file):
             new_docset = docSet(docset_A_id, [], [], {}, topic_id) # create a new docset
             for doc in docSetA.iter(tag='doc'): # iter through all docs
                 doc_id = doc.attrib["id"]
-                new_doc = document(doc_id, "", [], {}, topic_id) # create a new doc
+                time = doc_id[8:]
+                new_doc = document(doc_id, "", [], {}, topic_id, time) # create a new doc
                 new_docset._documentCluster.append(new_doc) # append the new doc to the docset's documentCluster member
             fullCorpus._docsetList.append(new_docset) # append the docset to the corpus' docsetList member
         """
@@ -105,7 +110,8 @@ def generate_corpus_from_xml(xml_file):
             new_docset = docSet(docset_B_id, [], [], {}, topic_id)
             for doc in docSetB.iter(tag='doc'):
                 doc_id = doc.attrib["id"]
-                new_doc = document(doc_id, "", [], {}, topic_id)
+                time = doc_id[8:]
+                new_doc = document(doc_id, "", [], {}, topic_id, time)
                 new_docset._documentCluster.append(new_doc)
             fullCorpus._docsetList.append(new_docset)
         """
