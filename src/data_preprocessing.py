@@ -66,12 +66,13 @@ class document:
         return self._time
 
 class sentence:
-    def __init__(self, idCode, content, index, score, length):
+    def __init__(self, idCode, content, index, score, length, tokenDict):
         self._idCode = idCode
         self._content = content
         self._index = index
         self._score = score
         self._length = length
+        self._tokenDict = tokenDict
 
     def idCode(self):
         return self._idCode
@@ -87,6 +88,9 @@ class sentence:
 
     def length(self):
         return self._length
+
+    def tokenDict(self):
+        return self._tokenDict
 
 def generate_corpus_from_xml(xml_file):
 # This function generates a corpus skeleton from the xml file for training/devtest/evaltest
@@ -163,47 +167,102 @@ def fill_in_corpus_data(fullCorpus, dir1, dir2):
             doc_id = doc._idCode
             doc_path, flag = generate_a_path(dir1, dir2, doc_id)
             tree = ET.ElementTree(file=doc_path) # read the xml file as an elemen tree
-            for sub_doc in tree.iter(tag='DOC'): # iterate through all sub-document in the doc
-                docno = sub_doc.find('DOCNO') # find the corresponding doc id
-                if docno == None:
-                    continue
-                if (docno.text.strip() != doc_id.strip()):
-                    continue
-                else:  
-                    body = sub_doc.find('BODY')    
-                    text_all = body.find('TEXT')
-                    if text_all == None:
+            if flag == False:
+                for sub_doc in tree.iter(tag='DOC'): # iterate through all sub-document in the doc
+                    docno = sub_doc.find('DOCNO') # find the corresponding doc id
+                    if docno == None:
                         continue
-                    para_all = text_all.find('P')
-                    if para_all == None: # some documents does not have <p> tag, in that case, content is in <text>
-                        index = 0
-                        sentences = nltk.tokenize.sent_tokenize(text_all.text) # sent_tokenize the whole text
-                        for sent in sentences:
-                            new_sent = sentence(doc_id, sent.strip(), index, 0, len(sent.strip()))
-                            index += 1
-                            doc._sentences.append(new_sent) # append the sentence to the data structure
-                            word_tokens = nltk.tokenize.word_tokenize(sent)
-                            for word in word_tokens: # store the word count in the dictionary
-                                if word in doc._tokenDict:
-                                    doc._tokenDict[hash(word)] += 1
-                                else:
-                                    doc._tokenDict[hash(word)] = 1
-                        break
+                    if (docno.text.strip() != doc_id.strip()):
+                        continue
                     else:
-                        index = 0
-                        for para in text_all.iter(tag='P'): # documents having <p> tag
-                            new_sent = sentence(doc_id, para.text.strip(), index, 0, len(para.text.strip()))
-                            index += 1
-                            doc._sentences.append(new_sent)
-                            word_tokens = nltk.tokenize.word_tokenize(para.text.strip())
-                            for word in word_tokens: # store the word count in the dictionary
-                                if word in doc._tokenDict:
-                                    doc._tokenDict[hash(word)] += 1
-                                else:
-                                    doc._tokenDict[hash(word)] = 1
-                        break
-            if flag == False: # if a new file is created
+                        body = sub_doc.find('BODY')    
+                        text_all = body.find('TEXT')
+                        if text_all == None:
+                            continue
+                        para_all = text_all.find('P')
+                        if para_all == None: # some documents does not have <p> tag, in that case, content is in <text>
+                            index = 0
+                            sentences = nltk.tokenize.sent_tokenize(text_all.text) # sent_tokenize the whole text
+                            for sent in sentences:
+                                new_sent = sentence(doc_id, sent.strip(), index, 0, len(sent.strip()), {})
+                                index += 1
+                                doc._sentences.append(new_sent) # append the sentence to the data structure
+                                word_tokens = nltk.tokenize.word_tokenize(sent)
+                                for word in word_tokens: # store the word count in the dictionary
+                                    if word in doc._tokenDict:
+                                        doc._tokenDict[hash(word)] += 1
+                                    else:
+                                        doc._tokenDict[hash(word)] = 1
+                                    if word in new_sent._tokenDict:
+                                        new_sent._tokenDict[hash(word)] += 1
+                                    else:
+                                        new_sent._tokenDict[hash(word)] = 1
+                            break
+                        else:
+                            index = 0
+                            for para in text_all.iter(tag='P'): # documents having <p> tag
+                                new_sent = sentence(doc_id, para.text.strip(), index, 0, len(para.text.strip()), {})
+                                index += 1
+                                doc._sentences.append(new_sent)
+                                word_tokens = nltk.tokenize.word_tokenize(para.text.strip())
+                                for word in word_tokens: # store the word count in the dictionary
+                                    if word in doc._tokenDict:
+                                        doc._tokenDict[hash(word)] += 1
+                                    else:
+                                        doc._tokenDict[hash(word)] = 1
+                                    if word in new_sent._tokenDict:
+                                        new_sent._tokenDict[hash(word)] += 1
+                                    else:
+                                        new_sent._tokenDict[hash(word)] = 1
+                            break
                 os.remove(doc_path) # remove the file to release the space
+            else:
+                for sub_doc in tree.iter(tag='DOC'): # iterate through all sub-document in the doc
+                    docno = sub_doc.attrib["id"]
+                    if docno == None:
+                        continue
+                    if (docno != doc_id.strip()):
+                        continue
+                    else:
+                        text_all = sub_doc.find('TEXT')
+                        if text_all == None:
+                            continue
+                        para_all = text_all.find('P')
+                        if para_all == None: # some documents does not have <p> tag, in that case, content is in <text>
+                            index = 0
+                            sentences = nltk.tokenize.sent_tokenize(text_all.text) # sent_tokenize the whole text
+                            for sent in sentences:
+                                new_sent = sentence(doc_id, sent.strip(), index, 0, len(sent.strip()), {})
+                                index += 1
+                                doc._sentences.append(new_sent) # append the sentence to the data structure
+                                word_tokens = nltk.tokenize.word_tokenize(sent)
+                                for word in word_tokens: # store the word count in the dictionary
+                                    if word in doc._tokenDict:
+                                        doc._tokenDict[hash(word)] += 1
+                                    else:
+                                        doc._tokenDict[hash(word)] = 1
+                                    if word in new_sent._tokenDict:
+                                        new_sent._tokenDict[hash(word)] += 1
+                                    else:
+                                        new_sent._tokenDict[hash(word)] = 1
+                            break
+                        else:
+                            index = 0
+                            for para in text_all.iter(tag='P'): # documents having <p> tag
+                                new_sent = sentence(doc_id, para.text.strip(), index, 0, len(para.text.strip()), {})
+                                index += 1
+                                doc._sentences.append(new_sent)
+                                word_tokens = nltk.tokenize.word_tokenize(para.text.strip())
+                                for word in word_tokens: # store the word count in the dictionary
+                                    if word in doc._tokenDict:
+                                        doc._tokenDict[hash(word)] += 1
+                                    else:
+                                        doc._tokenDict[hash(word)] = 1
+                                    if word in new_sent._tokenDict:
+                                        new_sent._tokenDict[hash(word)] += 1
+                                    else:
+                                        new_sent._tokenDict[hash(word)] = 1
+                            break
             update_dictionary(docSet._tokenDict, doc._tokenDict) # update the dictionary for the document set
         update_dictionary(fullCorpus._tokenDict, docSet._tokenDict) # update the dictionary for the corpus
     return fullCorpus
