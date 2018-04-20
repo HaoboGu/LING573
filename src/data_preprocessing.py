@@ -93,7 +93,7 @@ class sentence:
     def tokenDict(self):
         return self._tokenDict
 
-    def tokenDict(self):
+    def doctime(self):
         return self._doctime
 
 def generate_corpus_from_xml(xml_file):
