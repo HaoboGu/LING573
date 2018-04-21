@@ -78,6 +78,7 @@ Our team used the LexRank model to calculate the score for each sentence in the 
 Generate a 1-D vector $P$,  of length $m$ to record the score of each sentence, in which the $i^{th}$ entry represents the score for the $i^{th}$ sentence. The final step is trying to converge the vector $P$ using the update rule $P_t = M^T P_{t-1}$ to converge. In our experiment, we set the tolerance to be 0.001 and the convergence speed very fast.
 
 \subsection{Information Ordering}
+Given a list of sentences selected by Content Selection procedure and salient scores associated, the baseline model of Information Ordering takes inter-document chronology and intra-document cohesion into account. First, the model sorts the sentences first by their chronological order, meaning the dates of publication of the document from which a particular sentence is extracted. Secondly, within the same document, sentences are ordered linearly by their positions in the document to impose cohesion. 
 
 \subsection{Content Realization}
 \section{Results}

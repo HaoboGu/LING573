@@ -27,6 +27,8 @@ def sort_sentence_list(important_sentences):
     OUTPUT: sent_list: list[sentence]
     ========================
     """
+    important_sentences.sort(key=lambda x: x.score(), reverse=True) # sort the sentences per score
+    
     id_dic = {} # initialize a dictionary with idCode as keys and doctime as val
     id_dic2 = {} # initialize another dictionary with idCode as keys
     for s in important_sentences: # traverse through all sents
