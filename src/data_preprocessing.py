@@ -167,6 +167,7 @@ def update_dictionary(docset_dict, doc_dict):
 
 def update_the_doc(doc, sentence_text, idx, doc_id, doc_time):
     index = idx
+    sentence_text = sentence_text.replace('\n', ' ')
     sentences = nltk.tokenize.sent_tokenize(sentence_text) # sent_tokenize the whole text
     for sent in sentences:
         word_tokens = nltk.tokenize.word_tokenize(sent)
