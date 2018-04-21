@@ -104,4 +104,8 @@ ENV/
 .idea/*
 AQUAINT*
 Data/*
+stdout
+stderr
+*output/*
+log
 
