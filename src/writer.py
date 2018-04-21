@@ -38,8 +38,8 @@ def generate_output_filename_from_topic_id(topic_id):
     :type topic_id: str
     :return: output_filename, end with team number
     """
-    id_part1 = topic_id[:-1]
-    id_part2 = topic_id[-1]
+    id_part1 = topic_id[:-3]
+    id_part2 = topic_id[-3]
     if 'outputs' in os.listdir('.'):
         path = 'outputs'
     elif 'outputs' in os.listdir('..'):
