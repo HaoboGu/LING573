@@ -20,10 +20,10 @@ def cs(docset, compression_rate):
     docset_tokenDict = docset.tokenDict()
     sentence_matrix = sentence2matrix(allsentencelist, docset_tokenDict)
     sentence_similarity = calculate_sentence_similarity(sentence_matrix)
-    importance_score_vector = LexRank(sentence_similarity)
+    important_score_vector = LexRank(sentence_similarity)
     output_sen_num = int(len(allsentencelist) * compression_rate)
-    importance_sentences = generate_most_important_sentences(importance_score_vector, allsentencelist, output_sen_num)
-    return importance_sentences
+    important_sentences = generate_most_important_sentences(important_score_vector, allsentencelist, output_sen_num)
+    return important_sentences
 
 
 # This function generates a sentence list of all sentences in a given docset.
@@ -34,7 +34,7 @@ def generate_sentencelist(docset):
     for doc in docCluster:
         sentences = doc.sentences()
         for sentence in sentences:
-            if len(sentence._tokenDict) > 0:
+            if len(sentence.tokenDict()) > 0:
                 sentencelist.append(sentence)
     return sentencelist
 
