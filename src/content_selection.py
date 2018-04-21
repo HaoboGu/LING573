@@ -34,7 +34,8 @@ def generate_sentencelist(docset):
     for doc in docCluster:
         sentences = doc.sentences()
         for sentence in sentences:
-            sentencelist.append(sentence)
+            if len(sentence._tokenDict) > 0:
+                sentencelist.append(sentence)
     return sentencelist
 
 
