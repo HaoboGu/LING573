@@ -2,8 +2,8 @@
 
 ### imports
 ## modules
-import data_preprocessing as dp
-import content_selection as cs
+import src.data_preprocessing as dp
+import src.content_selection as cs
 
 ## other packages
 import operator
