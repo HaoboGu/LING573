@@ -3,6 +3,7 @@ import sys
 import os
 import re
 import nltk
+import string
 
 class corpus:
     def __init__(self, docsetList, tokenDict):
@@ -164,6 +165,29 @@ def update_dictionary(docset_dict, doc_dict):
         else:
             docset_dict[word] = doc_dict[word] # set the count
 
+def update_the_doc(doc, sentence_text, idx, doc_id, doc_time):
+    index = idx
+    sentences = nltk.tokenize.sent_tokenize(sentence_text) # sent_tokenize the whole text
+    for sent in sentences:
+        word_tokens = nltk.tokenize.word_tokenize(sent)
+        new_sent = sentence(doc_id, sent.strip(), index, 0, len(word_tokens), {}, doc_time)
+        index += 1                            
+        for word in word_tokens: # store the word count in the dictionary
+            if word in string.punctuation:
+                continue
+            if word in doc._tokenDict:
+                doc._tokenDict[hash(word)] += 1
+            else:
+                doc._tokenDict[hash(word)] = 1
+            if word in new_sent._tokenDict:
+                new_sent._tokenDict[hash(word)] += 1
+            else:
+                new_sent._tokenDict[hash(word)] = 1
+        new_sent._length = len(new_sent._tokenDict)
+        doc._sentences.append(new_sent) # append the sentence to the data structure
+    return index
+
+
 def fill_in_corpus_data(fullCorpus, dir1, dir2):
     # This function fill in the information of the corpus
     for docSet in fullCorpus._docsetList: # iterate through all document sets
@@ -186,41 +210,13 @@ def fill_in_corpus_data(fullCorpus, dir1, dir2):
                             continue
                         para_all = text_all.find('P')
                         if para_all == None: # some documents does not have <p> tag, in that case, content is in <text>
-                            index = 0
-                            sentences = nltk.tokenize.sent_tokenize(text_all.text) # sent_tokenize the whole text
-                            for sent in sentences:
-                                new_sent = sentence(doc_id, sent.strip(), index, 0, len(sent.strip()), {}, doc_time)
-                                index += 1
-                                doc._sentences.append(new_sent) # append the sentence to the data structure
-                                word_tokens = nltk.tokenize.word_tokenize(sent)
-                                for word in word_tokens: # store the word count in the dictionary
-                                    if word in doc._tokenDict:
-                                        doc._tokenDict[hash(word)] += 1
-                                    else:
-                                        doc._tokenDict[hash(word)] = 1
-                                    if word in new_sent._tokenDict:
-                                        new_sent._tokenDict[hash(word)] += 1
-                                    else:
-                                        new_sent._tokenDict[hash(word)] = 1
+                            update_the_doc(doc, text_all.text.strip(), 0, doc_id, doc_time)
                             break
                         else:
                             index = 0
                             for para in text_all.iter(tag='P'): # documents having <p> tag
-                                sent_list = nltk.tokenize.sent_tokenize(para.text.strip())
-                                for sent in sent_list:
-                                    new_sent = sentence(doc_id, sent, index, 0, len(sent), {}, doc_time)
-                                    index += 1
-                                    doc._sentences.append(new_sent)
-                                    word_tokens = nltk.tokenize.word_tokenize(para.text.strip())
-                                    for word in word_tokens: # store the word count in the dictionary
-                                        if word in doc._tokenDict:
-                                            doc._tokenDict[hash(word)] += 1
-                                        else:
-                                            doc._tokenDict[hash(word)] = 1
-                                        if word in new_sent._tokenDict:
-                                            new_sent._tokenDict[hash(word)] += 1
-                                        else:
-                                            new_sent._tokenDict[hash(word)] = 1
+                                update_idx = update_the_doc(doc, para.text.strip(), index, doc_id, doc_time)
+                                index += update_idx
                             break
                 os.remove(doc_path) # remove the file to release the space
             else:
@@ -236,41 +232,13 @@ def fill_in_corpus_data(fullCorpus, dir1, dir2):
                             continue
                         para_all = text_all.find('P')
                         if para_all == None: # some documents does not have <p> tag, in that case, content is in <text>
-                            index = 0
-                            sentences = nltk.tokenize.sent_tokenize(text_all.text) # sent_tokenize the whole text
-                            for sent in sentences:
-                                new_sent = sentence(doc_id, sent.strip(), index, 0, len(sent.strip()), {}, doc_time)
-                                index += 1
-                                doc._sentences.append(new_sent) # append the sentence to the data structure
-                                word_tokens = nltk.tokenize.word_tokenize(sent)
-                                for word in word_tokens: # store the word count in the dictionary
-                                    if word in doc._tokenDict:
-                                        doc._tokenDict[hash(word)] += 1
-                                    else:
-                                        doc._tokenDict[hash(word)] = 1
-                                    if word in new_sent._tokenDict:
-                                        new_sent._tokenDict[hash(word)] += 1
-                                    else:
-                                        new_sent._tokenDict[hash(word)] = 1
+                            update_the_doc(doc, text_all.text.strip(), 0, doc_id, doc_time)
                             break
                         else:
                             index = 0
                             for para in text_all.iter(tag='P'): # documents having <p> tag
-                                sent_list = nltk.tokenize.sent_tokenize(para.text.strip())
-                                for sent in sent_list:
-                                    new_sent = sentence(doc_id, sent, index, 0, len(sent), {}, doc_time)
-                                    index += 1
-                                    doc._sentences.append(new_sent)
-                                    word_tokens = nltk.tokenize.word_tokenize(para.text.strip())
-                                    for word in word_tokens: # store the word count in the dictionary
-                                        if word in doc._tokenDict:
-                                            doc._tokenDict[hash(word)] += 1
-                                        else:
-                                            doc._tokenDict[hash(word)] = 1
-                                        if word in new_sent._tokenDict:
-                                            new_sent._tokenDict[hash(word)] += 1
-                                        else:
-                                            new_sent._tokenDict[hash(word)] = 1
+                                update_idx = update_the_doc(doc, para.text.strip(), index, doc_id, doc_time)
+                                index += update_idx
                             break
             update_dictionary(docSet._tokenDict, doc._tokenDict) # update the dictionary for the document set
         update_dictionary(fullCorpus._tokenDict, docSet._tokenDict) # update the dictionary for the corpus
