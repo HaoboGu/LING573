@@ -17,10 +17,15 @@ class ContentRealization:
     """
     process method take summary content units(scu) as param and return summarized result
     :param solver: indicate the default solver type
+    :param max_length: the maximum summary length
+    :param lambda1: weight for importance, used only with ilp solver
+    :param lambda2: weight for diversity, used only with ilp solver
     """
-    def __init__(self, solver="simple", max_length=100):
+    def __init__(self, solver="simple", max_length=100, lambda1=0.5, lambda2=0.5):
         self.solver = solver
         self.max_length = max_length
+        self.lambda1 = lambda1
+        self.lambda2 = lambda2
 
     def _get_summarizations(self, scu):
         """
@@ -71,27 +76,34 @@ class ContentRealization:
         target_coef, c1_coef, c2_coef, c3_coef, c1_value, c2_value, c3_value = \
             self._calculate_coef(scu, bigram_dict, bigram_set)
 
-        bounds = tuple([(0, 1)]*len(c1_coef))  # bounds for variables
+        bounds = [(0, 1)]*len(c1_coef) # bounds for variables
         coefs = np.concatenate((np.array([c1_coef]), c2_coef, c3_coef))  # coefs
         values = np.concatenate((np.array([c1_value]), c2_value, c3_value))  # values on right hand side
         sol = linprog(-target_coef, A_ub=coefs, b_ub=values, bounds=bounds, method="simplex")
-        summary = []
+
         # Add sentences to summary
-        for index, item in enumerate(scu):
-            if abs(sol.x[index]-1) < 0.01:
-                summary.append(item.content())
+        summary = []
+        length_summary = 0
+        scores = np.array(sol.x[:len(scu)])
+        sorted_sents = np.array(scu)
+        # Because linprog isn't an ILP solver, resorting the linear programming result is needed
+        resort_index = scores.argsort()[::-1]
+        sorted_sents = sorted_sents[resort_index]
+        # print(scores[resort_index])
+        for sent in sorted_sents:
+            if length_summary + sent.length() < self.max_length:
+                summary.append(sent.content())
+                length_summary += sent.length()
 
         # Write result
         write(summary, topic_id, over_write=True)
 
-    def _calculate_coef(self, scu, bigram_dict, bigram_set, lambda1=0.5, lambda2=0.5):
+    def _calculate_coef(self, scu, bigram_dict, bigram_set):
         """
         Calculate coefficients for ILP.
         :param scu: a list of sentences
         :param bigram_dict: each sentence's bigrams
         :param bigram_set: set of all bigrams
-        :param lambda1: weight for importance
-        :param lambda2: weight for diversity
         :return: [target_coef, c1_coef, c2_coef, c3_coef, c1_value, c2_value, c3_value]
         """
         n_sentence = len(scu)  # number of sentences
@@ -107,9 +119,9 @@ class ContentRealization:
         target_imp_coef = np.zeros(n_sentence)
         target_div_coef = np.zeros(n_bigram)
         for i in range(n_sentence):
-            target_imp_coef[i] = lambda1 * scu[i].score() * sent_lens[i] / (self.max_length/min_sent_len)
+            target_imp_coef[i] = self.lambda1 * scu[i].score() * sent_lens[i] / (self.max_length/min_sent_len)
         for i in range(n_bigram):
-            target_div_coef[i] = lambda2 / n_sentence
+            target_div_coef[i] = self.lambda2 / n_sentence
         target_coef = np.concatenate((target_imp_coef, target_div_coef), axis=0)
 
         # Calculate coefs in constraint 1
@@ -190,9 +202,9 @@ if __name__ == "__main__":
     print('Start...')
 
     # Paths and variables
-    data_home = ".."
+    data_home = "."
     training_corpus_file = data_home + "/Data/Documents/training/2009/UpdateSumm09_test_topics.xml"
-    demo_training_corpus_file = data_home + "/Data/Documents/training/UpdateSumm09_demo_test_topics.xml"
+    demo_training_corpus_file = data_home + "/Data/UpdateSumm09_demo_test_topics18.xml"
     aqua = data_home + "/AQUAINT"
     aqua2 = data_home + "/AQUAINT-2/data"
     human_judge = data_home + "/Data/models/training/2009"
@@ -203,7 +215,6 @@ if __name__ == "__main__":
     training_corpus = dp.generate_corpus(demo_training_corpus_file, aqua, aqua2, human_judge)
     docset_list = training_corpus.docsetList()
     docset_dic = {}
-
     for docset in docset_list:  # traverse through all document sets
         print("Processing docset", docset.idCode())
         important_sentences = cs.cs(docset, compression_rate=comp_rate)  # content selection
