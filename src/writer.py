@@ -41,9 +41,9 @@ def generate_output_filename_from_topic_id(topic_id):
     id_part1 = topic_id[:-3]
     id_part2 = topic_id[-3]
     if 'outputs' in os.listdir('.'):
-        path = 'outputs'
+        path = 'outputs/D2'
     elif 'outputs' in os.listdir('..'):
-        path = '../outputs'
+        path = '../outputs/D2'
     else:
         print('cannot find output folder, store result in current folder')
         path = ''
