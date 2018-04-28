@@ -10,7 +10,7 @@
 import os
 
 
-def write(sentences, topic_id, over_write=True):
+def write(sentences, topic_id, output_folder_name='D3', over_write=True):
     """
     Write sentences to output file.
     :param sentences: summarization result
@@ -18,9 +18,10 @@ def write(sentences, topic_id, over_write=True):
     :param over_write: choose if overwrite the previous result
     :type sentences: list[str]
     :type topic_id: str
-    :type over_write: bool
+    :type output_folder_name: str
+    :type over_write: boolean
     """
-    output_filename = generate_output_filename_from_topic_id(topic_id)
+    output_filename = generate_output_filename_from_topic_id(topic_id, output_folder_name)
     if over_write:
         mode = 'w'
     else:
@@ -31,22 +32,22 @@ def write(sentences, topic_id, over_write=True):
             output_file.write(sentence+'\n')
 
 
-def generate_output_filename_from_topic_id(topic_id):
+def generate_output_filename_from_topic_id(topic_id, output_folder_name):
     """
-    Generate output filename according to the requirement on Canvas
-    :param topic_id: output filename contains topic_id information
+    Generate output filename according to topic id
     :type topic_id: str
+    :type output_folder_name: str
     :return: output_filename, end with team number
     """
     id_part1 = topic_id[:-3]
     id_part2 = topic_id[-3]
     if 'outputs' in os.listdir('.'):
-        path = 'outputs/D2'
+        path = 'outputs/' + output_folder_name
     elif 'outputs' in os.listdir('..'):
-        path = '../outputs/D2'
+        path = '../outputs/' + output_folder_name
     else:
         print('cannot find output folder, store result in current folder')
-        path = ''
+        path = '' + output_folder_name
     # our team number is 1
     return os.path.join(path, id_part1 + "-A.M.100." + id_part2 + '.1')
 
