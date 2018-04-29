@@ -26,6 +26,8 @@ def write(sentences, topic_id, output_folder_name='D3', over_write=True):
         mode = 'w'
     else:
         mode = 'a'  # append to file
+    if not os.path.exists(os.path.dirname(output_filename)):
+        os.makedirs(os.path.dirname(output_filename))
     with open(output_filename, mode) as output_file:
         # Write all sentences
         for sentence in sentences:
@@ -42,7 +44,7 @@ def generate_output_filename_from_topic_id(topic_id, output_folder_name):
     id_part1 = topic_id[:-3]
     id_part2 = topic_id[-3]
     if 'outputs' in os.listdir('.'):
-        path = 'outputs/' + output_folder_name
+        path = './outputs/' + output_folder_name
     elif 'outputs' in os.listdir('..'):
         path = '../outputs/' + output_folder_name
     else:

@@ -54,6 +54,8 @@ class ContentRealization:
                 self._simple_cr(scu, topic_id)
         elif self.solver == 'ilp':
             self._linear_prog(scu, topic_id)
+        elif self.solver == 'improved_ilp':
+            return self._improved_ilp(scu, topic_id)
 
     def _simple_cr(self, scu, topic_id):
         """
@@ -87,16 +89,95 @@ class ContentRealization:
         scores = np.array(sol.x[:len(scu)])
         sorted_sents = np.array(scu)
         # Because linprog isn't an ILP solver, resorting the linear programming result is needed
-        resort_index = scores.argsort()[::-1]
+        resort_index = scores.argsort()[::-1]  # it's stable so it reserves sentence order from io
         sorted_sents = sorted_sents[resort_index]
         # print(scores[resort_index])
         for sent in sorted_sents:
             if length_summary + sent.length() < self.max_length:
                 summary.append(sent.content())
                 length_summary += sent.length()
-
+        print('ilp:\n', summary)
         # Write result
-        write(summary, topic_id, over_write=True)
+        # write(summary, topic_id, over_write=True)
+
+    def _improved_ilp(self, scu, topic_id):
+        """
+        An improved ILP algorithm for sentence realization.
+        :param scu: list[Sentence]
+        :param topic_id: topic id for this docset
+        """
+        bigram_dict, bigram_set = get_bigrams(scu)
+        n_bigram = len(bigram_set)
+        n_sent = len(scu)
+
+        # Calculate weights in objective function
+        # Count every bigram's occurrence
+        bigram_freq = {}
+        for index in bigram_dict:
+            for bigram in bigram_dict[index]:
+                if bigram not in bigram_freq:
+                    bigram_freq[bigram] = 1
+                else:
+                    bigram_freq[bigram] = bigram_freq[bigram] + 1
+        # The order of bigram variables
+        bigram_list = list(bigram_set)
+        # Use frequency of bigram as its weight
+        weight = []
+        for i in range(n_bigram):
+            weight.append(bigram_freq[bigram_list[i]])
+        weight = np.concatenate((np.array(weight), np.zeros(n_sent)), axis=0)  # add s_j after c_i
+
+        # Calculate coefs
+        # Variable: c_i, s_j
+        n_constraint = 0
+        coefs_1 = []  # constraint 1, i*j rows
+        coefs_2 = []  # constraint 2, i rows
+        for i in range(n_bigram):
+            coefs_sum_s = np.zeros(n_sent)
+            for j in range(n_sent):
+                coefs_c = np.zeros(n_bigram)
+                coefs_s = np.zeros(n_sent)
+                if bigram_list[i] in bigram_dict[j]:
+                    # c_i in s_j, s_j - c_i <= 0
+                    coefs_c[i] = -1
+                    coefs_s[j] = 1
+                    coefs_sum_s[j] = -1
+                    coefs_1.append(np.concatenate((coefs_c, coefs_s), axis=0))
+                    n_constraint += 1
+            coefs_sum_c = np.zeros(n_bigram)
+            coefs_sum_c[i] = 1
+            coefs_2.append(np.concatenate((coefs_sum_c, coefs_sum_s), axis=0))
+            n_constraint += 1
+
+        coefs_3_s = np.zeros(n_sent)  # constraint 3, length constraint, 1 row
+        for i in range(n_sent):
+            coefs_3_s[i] = scu[i].length()
+        coefs_3 = np.concatenate((np.zeros(n_bigram), coefs_3_s))
+        value_3 = [self.max_length]
+
+        coefs = np.concatenate((np.array(coefs_1), np.array(coefs_2), np.array([coefs_3])))
+        values = np.concatenate((np.zeros(n_constraint), value_3))
+        bounds = [(0, 1)]*(n_sent + n_bigram)  # bounds for variables
+        # print(coefs.shape, values.shape)
+        sol = linprog(-weight, A_ub=coefs, b_ub=values, bounds=bounds, method="simplex")
+
+        summary = []
+        length_summary = 0
+        scores = np.array(sol.x[:len(scu)])
+        sorted_sents = np.array(scu)
+        # Because linprog isn't an ILP solver, resorting the linear programming result is needed
+        resort_index = scores.argsort()[::-1]  # it's stable so it reserves sentence order from io
+        sorted_sents = sorted_sents[resort_index]
+        # print(scores[resort_index])
+        for sent in sorted_sents:
+            if length_summary + sent.length() < self.max_length:
+                summary.append(sent.content())
+                length_summary += sent.length()
+        write(summary, topic_id, output_folder_name='D3', over_write=True)
+        # print('improved:\n', summary)
+        return sol
+        # Write result
+
 
     def _calculate_coef(self, scu, bigram_dict, bigram_set):
         """
@@ -219,8 +300,10 @@ if __name__ == "__main__":
         print("Processing docset", docset.idCode())
         important_sentences = cs.cs(docset, compression_rate=comp_rate)  # content selection
         sent_list = io.sort_sentence_list(important_sentences)  # sort important sentences
-        content_realization = ContentRealization(solver="ilp")  # use simple solver in cr
+        content_realization = ContentRealization(solver="improved_ilp")  # use simple solver in cr
         content_realization.cr(sent_list, docset.idCode())
+        # content_realization = ContentRealization(solver="ilp")  # use simple solver in cr
+        # content_realization.cr(sent_list, docset.idCode())
 
 
 
