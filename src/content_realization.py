@@ -10,8 +10,8 @@
 from src.writer import write
 import nltk
 import numpy as np
-from scipy.optimize import linprog
 import pulp
+
 
 class ContentRealization:
     """
@@ -26,6 +26,19 @@ class ContentRealization:
         self.max_length = max_length
         self.lambda1 = lambda1
         self.lambda2 = lambda2
+
+    def cr(self, scu, topic_id):
+        """
+        Content realization. Write the summary to output file.
+        :param scu: list of sentence
+        :param topic_id: topic id for this doc set
+        """
+        if self.solver == 'simple':
+                self._simple_cr(scu, topic_id)
+        elif self.solver == 'ilp':
+            self._linear_prog(scu, topic_id)
+        elif self.solver == 'improved_ilp':
+            self._improved_ilp(scu, topic_id)
 
     def _get_summarizations(self, scu):
         """
@@ -44,19 +57,6 @@ class ContentRealization:
                 total_length += sent_lens[index]
         return summary
 
-    def cr(self, scu, topic_id):
-        """
-        Content realization. Write the summary to output file.
-        :param scu: list of sentence
-        :param topic_id: topic id for this doc set
-        """
-        if self.solver == 'simple':
-                self._simple_cr(scu, topic_id)
-        elif self.solver == 'ilp':
-            self._linear_prog(scu, topic_id)
-        elif self.solver == 'improved_ilp':
-            return self._improved_ilp(scu, topic_id)
-
     def _simple_cr(self, scu, topic_id):
         """
         Process a single docset and write the result to corresponding output file
@@ -74,45 +74,6 @@ class ContentRealization:
         :param topic_id: topic id for this docset
         """
         bigram_dict, bigram_set = get_bigrams(scu)
-        # Get coefficients for ILP
-        # target_coef, c1_coef, c2_coef, c3_coef, c1_value, c2_value, c3_value = \
-        #     self._calculate_coef(scu, bigram_dict, bigram_set)
-
-        # bounds = [(0, 1)]*len(c1_coef) # bounds for variables
-        # coefs = np.concatenate((np.array([c1_coef]), c2_coef, c3_coef))  # coefs
-        # values = np.concatenate((np.array([c1_value]), c2_value, c3_value))  # values on right hand side
-        # sol = linprog(-target_coef, A_ub=coefs, b_ub=values, bounds=bounds, method="simplex")
-
-        # Add sentences to summary
-        # summary = []
-        # length_summary = 0
-        # scores = np.array(sol.x[:len(scu)])
-        # sorted_sents = np.array(scu)
-        # # Because linprog isn't an ILP solver, resorting the linear programming result is needed
-        # resort_index = scores.argsort()[::-1]  # it's stable so it reserves sentence order from io
-        # sorted_sents = sorted_sents[resort_index]
-        # for sent in sorted_sents:
-        #     if length_summary + sent.length() < self.max_length:
-        #         summary.append(sent.content())
-        #         length_summary += sent.length()
-        # # Write result
-        # write(summary, topic_id, over_write=True)
-
-        use_pulp = True
-        if use_pulp:
-            summary = self._calculate_coef(scu, bigram_dict, bigram_set)
-            print(summary)
-            # Write result
-            write(summary, topic_id, output_folder_name='D3', over_write=True)
-
-    def _calculate_coef(self, scu, bigram_dict, bigram_set):
-        """
-        Calculate coefficients for ILP.
-        :param scu: a list of sentences
-        :param bigram_dict: each sentence's bigrams
-        :param bigram_set: set of all bigrams
-        :return: [target_coef, c1_coef, c2_coef, c3_coef, c1_value, c2_value, c3_value]
-        """
         n_sentence = len(scu)  # number of sentences
         n_bigram = len(bigram_set)  # number of different bigrams
         bigram_list = list(bigram_set)
@@ -129,12 +90,10 @@ class ContentRealization:
             target_imp_coef[i] = self.lambda1 * scu[i].score() * sent_lens[i] / (self.max_length / min_sent_len)
         for i in range(n_bigram):
             target_div_coef[i] = self.lambda2 / n_sentence
-        target_coef = np.concatenate((target_imp_coef, target_div_coef), axis=0)
+        # target_coef = np.concatenate((target_imp_coef, target_div_coef), axis=0)
 
         # Calculate coefs in constraint 1
-        c1_coef = np.concatenate((np.array(sent_lens), np.zeros(n_bigram)), axis=0)
-        c1_coef = np.array(c1_coef)
-        c1_value = np.array(self.max_length)
+        # c1_coef = np.concatenate((np.array(sent_lens), np.zeros(n_bigram)), axis=0)
 
         # Calculate coefs in constraint 2, n_sentence constraints in total
         c2_coef = []
@@ -148,12 +107,10 @@ class ContentRealization:
                 bigram_index = bigram_list.index(bigram)
                 c2_bi_coef[bigram_index] = -1
             c2_coef.append(np.concatenate((c2_sent_coef, c2_bi_coef), axis=0))
-        c2_value = np.zeros(n_sentence)  # value on right hand side
         c2_coef = np.array(c2_coef)
 
         # Calculate coefs in constraint 3, n_bigram constraints in total
         c3_coef = []
-        c3_value = np.zeros(n_bigram)  # value on right hand side
         for j in range(n_bigram):
             cur_bigram = bigram_list[j]
             c3_sent_coef = np.zeros(n_sentence)
@@ -164,188 +121,117 @@ class ContentRealization:
                     c3_sent_coef[i] = -1
             c3_bi_coef[j] = 1  # coef of current bigram is 1
             c3_coef.append(np.concatenate((c3_sent_coef, c3_bi_coef), axis=0))
-
         c3_coef = np.array(c3_coef)
-        use_pulp = True
-        if use_pulp:
-            ilp_model = pulp.LpProblem('content realization', pulp.LpMaximize)
-            # Define variables
-            sentences = pulp.LpVariable.dict("sentence", (i for i in range(n_sentence)),
-                                             lowBound=0, upBound=1, cat=pulp.LpInteger)
-            concepts = pulp.LpVariable.dict("concept", (i for i in range(n_bigram)),
-                                            lowBound=0, upBound=1, cat=pulp.LpInteger)
-            # Add objective function
-            ilp_model += pulp.lpSum([target_imp_coef[int(key)] * sentences[key] for key in sentences] +
-                                    [target_div_coef[int(key)] * concepts[key] for key in concepts])
-            # Add length constraint
-            ilp_model += pulp.lpSum([sent_lens[int(key)] * sentences[key] for key in sentences]) <= self.max_length
-            # Add constraints 1
-            for coefs in c2_coef:
-                ilp_model += pulp.lpSum([coefs[key] * sentences[key] for key in sentences] +
-                                        [coefs[key2+n_sentence] * concepts[key2] for key2 in concepts]) <= 0
-            # Add constraints 2
-            for coefs in c3_coef:
-                ilp_model += pulp.lpSum([coefs[key] * sentences[key] for key in sentences] +
-                                        [coefs[key2 + n_sentence] * concepts[key2] for key2 in concepts]) <= 0
 
-            # ilp_model.writeLP('ilp_model')  # write ilp model to file
-            ilp_model.solve()
-            indices = np.array([sentences[key].value() for key in sentences])
-            summary = [sent.content() for sent in np.array(scu)[indices > 0.1]]
-        return summary  # target_coef, c1_coef, c2_coef, c3_coef, c1_value, c2_value, c3_value
+        ilp_model = pulp.LpProblem('content realization', pulp.LpMaximize)
+        # Define variables
+        sentences = pulp.LpVariable.dict("sentence", (i for i in range(n_sentence)),
+                                         lowBound=0, upBound=1, cat=pulp.LpInteger)
+        concepts = pulp.LpVariable.dict("bigram", (i for i in range(n_bigram)),
+                                        lowBound=0, upBound=1, cat=pulp.LpInteger)
+        # Add objective function
+        ilp_model += pulp.lpSum([target_imp_coef[int(key)] * sentences[key] for key in sentences] +
+                                [target_div_coef[int(key)] * concepts[key] for key in concepts])
+        # Add length constraint
+        ilp_model += pulp.lpSum([sent_lens[int(key)] * sentences[key] for key in sentences]) <= self.max_length
+        # Add constraints 1
+        for coefs in c2_coef:
+            ilp_model += pulp.lpSum([coefs[key] * sentences[key] for key in sentences] +
+                                    [coefs[key2 + n_sentence] * concepts[key2] for key2 in concepts]) <= 0
+        # Add constraints 2
+        for coefs in c3_coef:
+            ilp_model += pulp.lpSum([coefs[key] * sentences[key] for key in sentences] +
+                                    [coefs[key2 + n_sentence] * concepts[key2] for key2 in concepts]) <= 0
+
+        # ilp_model.writeLP('ilp_model')  # write ilp model to file
+        ilp_model.solve()
+        indices = np.array([sentences[key].value() for key in sentences])
+        summary = [sent.content() for sent in np.array(scu)[indices > 0.1]]
+
+        # Write result
+        write(summary, topic_id, output_folder_name='D3', over_write=True)
 
     def _improved_ilp(self, scu, topic_id):
         """
-        An improved ILP algorithm for sentence realization.
+        An improved ILP algorithm for sentence realization. For details, please check:
+        A Scalable Global Model for Summarization
         :param scu: list[Sentence]
         :param topic_id: topic id for this docset
         """
-        use_pulp = True
-        if use_pulp:
-            bigram_dict, bigram_set = get_bigrams(scu)
-            n_bigram = len(bigram_set)
-            n_sent = len(scu)
+        bigram_dict, bigram_set = get_bigrams(scu)
+        n_bigram = len(bigram_set)
+        n_sent = len(scu)
 
-            # Calculate weights in objective function
-            # Count every bigram's occurrence
-            bigram_freq = {}
-            for index in bigram_dict:
-                for bigram in bigram_dict[index]:
-                    if bigram not in bigram_freq:
-                        bigram_freq[bigram] = 1
-                    else:
-                        bigram_freq[bigram] = bigram_freq[bigram] + 1
+        # Calculate weights in objective function
+        # Count every bigram's occurrence
+        bigram_freq = {}
+        for index in bigram_dict:
+            for bigram in bigram_dict[index]:
+                if bigram not in bigram_freq:
+                    bigram_freq[bigram] = 1
+                else:
+                    bigram_freq[bigram] = bigram_freq[bigram] + 1
 
-            # The order of bigram variables
-            bigram_list = list(bigram_set)
-            # Use frequency of bigram as its weight
-            weight = []
-            for i in range(n_bigram):
-                weight.append(bigram_freq[bigram_list[i]])
-            weight = np.concatenate((np.array(weight), np.zeros(n_sent)), axis=0)  # add s_j after c_i
+        # The order of bigram variables
+        bigram_list = list(bigram_set)
+        # Use frequency of bigram as its weight
+        weight = []
+        for i in range(n_bigram):
+            weight.append(bigram_freq[bigram_list[i]])
+        weight = np.concatenate((np.array(weight), np.zeros(n_sent)), axis=0)  # add s_j after c_i
 
-            # Calculate coefs
-            # Variable: c_i, s_j
-            n_constraint = 0
-            coefs_1 = []  # constraint 1, i*j rows
-            coefs_2 = []  # constraint 2, i rows
-            for i in range(n_bigram):
-                coefs_sum_s = np.zeros(n_sent)
-                for j in range(n_sent):
-                    coefs_c = np.zeros(n_bigram)
-                    coefs_s = np.zeros(n_sent)
-                    if bigram_list[i] in bigram_dict[j]:
-                        # c_i in s_j, s_j - c_i <= 0
-                        coefs_c[i] = -1
-                        coefs_s[j] = 1
-                        coefs_sum_s[j] = -1
-                        coefs_1.append(np.concatenate((coefs_c, coefs_s), axis=0))
-                        n_constraint += 1
-                coefs_sum_c = np.zeros(n_bigram)
-                coefs_sum_c[i] = 1
-                coefs_2.append(np.concatenate((coefs_sum_c, coefs_sum_s), axis=0))
-                n_constraint += 1
+        # Calculate coefs
+        # Variable: c_i, s_j
+        n_constraint = 0
+        coefs_1 = []  # constraint 1, i*j rows
+        coefs_2 = []  # constraint 2, i rows
+        for i in range(n_bigram):
+            coefs_sum_s = np.zeros(n_sent)
+            for j in range(n_sent):
+                coefs_c = np.zeros(n_bigram)
+                coefs_s = np.zeros(n_sent)
+                if bigram_list[i] in bigram_dict[j]:
+                    # c_i in s_j, s_j - c_i <= 0
+                    coefs_c[i] = -1
+                    coefs_s[j] = 1
+                    coefs_sum_s[j] = -1
+                    coefs_1.append(np.concatenate((coefs_c, coefs_s), axis=0))
+                    n_constraint += 1
+            coefs_sum_c = np.zeros(n_bigram)
+            coefs_sum_c[i] = 1
+            coefs_2.append(np.concatenate((coefs_sum_c, coefs_sum_s), axis=0))
+            n_constraint += 1
 
-            coefs_3_s = np.zeros(n_sent)  # constraint 3, length constraint, 1 row
-            for i in range(n_sent):
-                coefs_3_s[i] = scu[i].length()
+        coefs_3_s = np.zeros(n_sent)  # constraint 3, length constraint, 1 row
+        for i in range(n_sent):
+            coefs_3_s[i] = scu[i].length()
 
-            # Use pulp to solve ILP problem
-            ilp_model = pulp.LpProblem('content realization', pulp.LpMaximize)
-            # Define variables
-            sentences = pulp.LpVariable.dict("sentence", (i for i in range(n_sent)),
-                                             lowBound=0, upBound=1, cat=pulp.LpInteger)
-            concepts = pulp.LpVariable.dict("concept", (i for i in range(n_bigram)),
-                                            lowBound=0, upBound=1, cat=pulp.LpInteger)
-            # Add objective function
-            ilp_model += pulp.lpSum([weight[int(key)] * concepts[key] for key in concepts]), "Objective function"
-            # Add length constraint
-            ilp_model += pulp.lpSum([coefs_3_s[int(key)] * sentences[key] for key in sentences]) <= self.max_length
-            # Add constraints 1
-            for coefs in coefs_1:
-                ilp_model += pulp.lpSum([coefs[key] * concepts[key] for key in concepts] +
-                                        [coefs[key2+n_bigram] * sentences[key2] for key2 in sentences]) <= 0
-            # Add constraints 2
-            for coefs in coefs_2:
-                ilp_model += pulp.lpSum([coefs[key] * concepts[key] for key in concepts] +
-                                        [coefs[key2 + n_bigram] * sentences[key2] for key2 in sentences]) <= 0
+        # Use pulp to solve ILP problem
+        ilp_model = pulp.LpProblem('content realization', pulp.LpMaximize)
+        # Define variables
+        sentences = pulp.LpVariable.dict("sentence", (i for i in range(n_sent)),
+                                         lowBound=0, upBound=1, cat=pulp.LpInteger)
+        concepts = pulp.LpVariable.dict("concept", (i for i in range(n_bigram)),
+                                        lowBound=0, upBound=1, cat=pulp.LpInteger)
+        # Add objective function
+        ilp_model += pulp.lpSum([weight[int(key)] * concepts[key] for key in concepts]), "Objective function"
+        # Add length constraint
+        ilp_model += pulp.lpSum([coefs_3_s[int(key)] * sentences[key] for key in sentences]) <= self.max_length
+        # Add constraints 1
+        for coefs in coefs_1:
+            ilp_model += pulp.lpSum([coefs[key] * concepts[key] for key in concepts] +
+                                    [coefs[key2+n_bigram] * sentences[key2] for key2 in sentences]) <= 0
+        # Add constraints 2
+        for coefs in coefs_2:
+            ilp_model += pulp.lpSum([coefs[key] * concepts[key] for key in concepts] +
+                                    [coefs[key2 + n_bigram] * sentences[key2] for key2 in sentences]) <= 0
 
-            # ilp_model.writeLP('ilp_model')  # write ilp model to file
-            ilp_model.solve()
-            indices = np.array([sentences[key].value() for key in sentences])
-            summary = [sent.content() for sent in np.array(scu)[indices > 0.1]]
-            # Write result
-            write(summary, topic_id, output_folder_name='D3', over_write=True)
-
-        else:
-            bigram_dict, bigram_set = get_bigrams(scu)
-            n_bigram = len(bigram_set)
-            n_sent = len(scu)
-
-            # Calculate weights in objective function
-            # Count every bigram's occurrence
-            bigram_freq = {}
-            for index in bigram_dict:
-                for bigram in bigram_dict[index]:
-                    if bigram not in bigram_freq:
-                        bigram_freq[bigram] = 1
-                    else:
-                        bigram_freq[bigram] = bigram_freq[bigram] + 1
-
-            # The order of bigram variables
-            bigram_list = list(bigram_set)
-            # Use frequency of bigram as its weight
-            weight = []
-            for i in range(n_bigram):
-                weight.append(bigram_freq[bigram_list[i]])
-            weight = np.concatenate((np.array(weight), np.zeros(n_sent)), axis=0)  # add s_j after c_i
-
-            # Calculate coefs
-            # Variable: c_i, s_j
-            n_constraint = 0
-            coefs_1 = []  # constraint 1, i*j rows
-            coefs_2 = []  # constraint 2, i rows
-            for i in range(n_bigram):
-                coefs_sum_s = np.zeros(n_sent)
-                for j in range(n_sent):
-                    coefs_c = np.zeros(n_bigram)
-                    coefs_s = np.zeros(n_sent)
-                    if bigram_list[i] in bigram_dict[j]:
-                        # c_i in s_j, s_j - c_i <= 0
-                        coefs_c[i] = -1
-                        coefs_s[j] = 1
-                        coefs_sum_s[j] = -1
-                        coefs_1.append(np.concatenate((coefs_c, coefs_s), axis=0))
-                        n_constraint += 1
-                coefs_sum_c = np.zeros(n_bigram)
-                coefs_sum_c[i] = 1
-                coefs_2.append(np.concatenate((coefs_sum_c, coefs_sum_s), axis=0))
-                n_constraint += 1
-
-            coefs_3_s = np.zeros(n_sent)  # constraint 3, length constraint, 1 row
-            for i in range(n_sent):
-                coefs_3_s[i] = scu[i].length()
-            coefs_3 = np.concatenate((np.zeros(n_bigram), coefs_3_s))
-            value_3 = [self.max_length]
-
-            coefs = np.concatenate((np.array(coefs_1), np.array(coefs_2), np.array([coefs_3])))
-            values = np.concatenate((np.zeros(n_constraint), value_3))
-            bounds = [(0, 1)]*(n_sent + n_bigram)  # bounds for variables
-            sol = linprog(-weight, A_ub=coefs, b_ub=values, bounds=bounds, method="simplex")
-
-            summary = []
-            length_summary = 0
-            scores = np.array(sol.x[:len(scu)])
-            sorted_sents = np.array(scu)
-            # Because linprog isn't an ILP solver, resorting the linear programming result is needed
-            resort_index = scores.argsort()[::-1]  # it's stable so it reserves sentence order from io
-            sorted_sents = sorted_sents[resort_index]
-            for sent in sorted_sents:
-                if length_summary + sent.length() < self.max_length:
-                    summary.append(sent.content())
-                    length_summary += sent.length()
-            write(summary, topic_id, output_folder_name='D3', over_write=True)
-
+        # ilp_model.writeLP('ilp_model')  # write ilp model to file
+        ilp_model.solve()
+        indices = np.array([sentences[key].value() for key in sentences])
+        summary = [sent.content() for sent in np.array(scu)[indices > 0.1]]
+        # Write result
+        write(summary, topic_id, output_folder_name='D3', over_write=True)
 
 
 # Helper functions
@@ -405,9 +291,7 @@ if __name__ == "__main__":
         print("Processing docset", docset.idCode())
         important_sentences = cs.cs(docset, compression_rate=comp_rate)  # content selection
         sent_list = io.sort_sentence_list(important_sentences)  # sort important sentences
-        # content_realization = ContentRealization(solver="improved_ilp")  # use simple solver in cr
-        # content_realization.cr(sent_list, docset.idCode())
-        content_realization = ContentRealization(solver="ilp")  # use simple solver in cr
+        content_realization = ContentRealization(solver="improved_ilp")  # use improved ILP solver in cr
         content_realization.cr(sent_list, docset.idCode())
 
 

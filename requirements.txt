@@ -1,2 +1,7 @@
 PuLP==1.6.8
 pyparsing==2.2.0
+scikit-learn
+scipy
+nltk
+numpy
+
