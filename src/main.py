@@ -29,7 +29,7 @@ if __name__ == "__main__":
     converge_standard = 0.001  # Used to judge if the score is converging
 
     print("Reading Corpus...")
-    training_corpus = dp.generate_corpus(demo_training_corpus_file, aqua, aqua2, human_judge)
+    training_corpus = dp.generate_corpus(training_corpus_file, aqua, aqua2, human_judge)
     docset_list = training_corpus.docsetList()
     docset_dic = {}
 
