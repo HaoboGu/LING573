@@ -11,8 +11,9 @@ if __name__ == "__main__":
     use_local_file = False
     # Paths and variables
     if use_local_file:
-        data_home = "/dropbox/17-18/573"
-        demo_training_corpus_file = "./Data/UpdateSumm09_demo_test_topics.xml"
+        # data_home = "/dropbox/17-18/573"
+        data_home = ".."
+        demo_training_corpus_file = "../Data/UpdateSumm09_demo_test_topics18.xml"
         training_corpus_file = data_home + "/Data/Documents/training/2009/UpdateSumm09_test_topics.xml"
         aqua = data_home + "/AQUAINT"
         aqua2 = data_home + "/AQUAINT-2/data"
@@ -28,7 +29,7 @@ if __name__ == "__main__":
     converge_standard = 0.001  # Used to judge if the score is converging
 
     print("Reading Corpus...")
-    training_corpus = dp.generate_corpus(training_corpus_file, aqua, aqua2, human_judge)
+    training_corpus = dp.generate_corpus(demo_training_corpus_file, aqua, aqua2, human_judge)
     docset_list = training_corpus.docsetList()
     docset_dic = {}
 
@@ -36,7 +37,7 @@ if __name__ == "__main__":
         print("Processing docset", docset.idCode())
         important_sentences = cs.cs(docset, compression_rate=comp_rate)  # content selection
         sent_list = io.sort_sentence_list(important_sentences)  # sort important sentences
-        content_realization = cr.ContentRealization(solver="ilp", lambda1=0.5, lambda2=0.5)  # use simple solver in cr
+        content_realization = cr.ContentRealization(solver="improved_ilp", lambda1=0.5, lambda2=0.5)
         content_realization.cr(sent_list, docset.idCode())
     print("Complete!")
 
