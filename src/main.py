@@ -37,6 +37,8 @@ if __name__ == "__main__":
         print("Processing docset", docset.idCode())
         important_sentences = cs.cs(docset, compression_rate=comp_rate)  # content selection
         sent_list = io.sort_sentence_list(important_sentences)  # sort important sentences
-        content_realization = cr.ContentRealization(solver="improved_ilp", lambda1=0.5, lambda2=0.5)
+        content_realization = cr.ContentRealization(solver="improved_ilp", lambda1=0.5, lambda2=0.5,
+                                                    output_folder_name='D3',
+                                                    prune_pipe=['apposition', 'advcl', 'parenthesis'])
         content_realization.cr(sent_list, docset.idCode())
     print("Complete!")

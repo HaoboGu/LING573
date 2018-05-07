@@ -24,7 +24,8 @@ class ContentRealization:
     :param lambda1: weight for importance, used only with ilp solver
     :param lambda2: weight for diversity, used only with ilp solver
     """
-    def __init__(self, solver="simple", max_length=100, lambda1=0.5, lambda2=0.5):
+    def __init__(self, solver="simple", max_length=100, lambda1=0.5, lambda2=0.5, output_folder_name='D3',
+                 prune_pipe=('parenthesis', 'advcl', 'apposition')):
         self.solver = solver
         self.max_length = max_length
         self.lambda1 = lambda1
@@ -32,6 +33,8 @@ class ContentRealization:
         self.parenthesis_re = re.compile(r'(\[.+\])|(\(.+\))|(\{.+\})')  # match contents in parenthesis
         self.space_re = re.compile(r'\s+')  # match continuous spaces
         self.nlp = spacy.load('en')
+        self.output_folder_name = output_folder_name
+        self.prune_pipe = prune_pipe
 
     def cr(self, scu, topic_id):
         """
@@ -105,8 +108,10 @@ class ContentRealization:
                                 appo_start = subtree[0].i - 1
                             if subtree[-1].dep_ == 'punct':
                                 appo_end = subtree[-1].i
-                            else:
+                            elif subtree[-1].i + 1 < len(tokens):
                                 appo_end = subtree[-1].i + 1
+                            else:
+                                appo_end = subtree[-1].i
                             # If the apposition is surrounded by puncs, remove it
                             if tokens[appo_end].dep_ == 'punct' and tokens[appo_start].dep_ == 'punct':
                                 print(subtree, 'is removed')
@@ -245,7 +250,7 @@ class ContentRealization:
         :param scu: list[Sentence]
         :param topic_id: topic id for this docset
         """
-        scu = self.prune_pipeline(scu, ['parenthesis', 'advcl', 'apposition'])
+        scu = self.prune_pipeline(scu, self.prune_pipe)
         bigram_dict, bigram_set = get_bigrams(scu)
         n_bigram = len(bigram_set)
         n_sent = len(scu)
@@ -318,7 +323,7 @@ class ContentRealization:
         indices = np.array([sentences[key].value() for key in sentences])
         summary = [sent.content() for sent in np.array(scu)[indices > 0.1]]
         # Write result
-        write(summary, topic_id, output_folder_name='D3', over_write=True)
+        write(summary, topic_id, output_folder_name=self.output_folder_name, over_write=True)
 
 
 # Helper functions
