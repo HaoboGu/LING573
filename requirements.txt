@@ -1,0 +1,6 @@
+PuLP==1.6.8
+pyparsing==2.2.0
+numpy==1.13.1
+scipy==1.1.0
+scikit-learn==0.19.0
+nltk==3.3
