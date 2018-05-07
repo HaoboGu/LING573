@@ -76,6 +76,12 @@ class sentence:
         self._tokenDict = tokenDict
         self._doctime = doctime
 
+    def set_content(self, content):
+        self._content = content
+
+    def set_length(self, length):
+        self._length = length
+
     def idCode(self):
         return self._idCode
 

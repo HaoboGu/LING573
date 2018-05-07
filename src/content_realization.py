@@ -11,6 +11,9 @@ from src.writer import write
 import nltk
 import numpy as np
 import pulp
+import spacy
+import re
+import string
 
 
 class ContentRealization:
@@ -26,6 +29,8 @@ class ContentRealization:
         self.max_length = max_length
         self.lambda1 = lambda1
         self.lambda2 = lambda2
+        self.parenthesis_re = re.compile(r'(\[\S+\])|(\(\S+\))|(\{\S+\})')  # match contents in parenthesis
+        self.nlp = spacy.load('en')
 
     def cr(self, scu, topic_id):
         """
@@ -39,6 +44,36 @@ class ContentRealization:
             self._linear_prog(scu, topic_id)
         elif self.solver == 'improved_ilp':
             self._improved_ilp(scu, topic_id)
+        # elif self.solver == 'parse_tree':
+        #     self._parse_tree(scu, topic_id)
+
+    def prune(self, scu):
+        """
+        Prune sentences by removing unnecessary constituents. Modify scu in place.
+        :param scu: list of sentence
+        """
+        for index, item in scu:
+            sent = item.content()
+            sent = re.sub(self.parenthesis_re, '', sent).strip(' ')  # remove all contents in a pair of parenthesis
+            tokens = self.nlp(sent)
+            if tokens[0].dep_ == 'advcl' or tokens[0].dep_ == 'prep':
+                # If sentence starts with a short adv clause, remove this clause
+                # Or if sentence starts with a short preposition phrase, remove it as well
+                if ',' in sent[0:8]:
+                    print('remove:', sent[:sent.find(',')])
+                    sent = sent[sent.find(',')+1:].strip().capitalize()
+
+            # Re-calculate sentence length
+            n_puncs = 0
+            word_seq = nltk.word_tokenize(sent)
+            for word in word_seq:
+                if word in string.punctuation:
+                    n_puncs += 1
+            # Update scu
+            scu[index].set_content(sent)
+            scu[index].set_length(len(word_seq)-n_puncs)
+
+        return scu
 
     def _get_summarizations(self, scu):
         """
@@ -158,6 +193,7 @@ class ContentRealization:
         :param scu: list[Sentence]
         :param topic_id: topic id for this docset
         """
+        scu = self.prune(scu)
         bigram_dict, bigram_set = get_bigrams(scu)
         n_bigram = len(bigram_set)
         n_sent = len(scu)
@@ -166,14 +202,13 @@ class ContentRealization:
         # Count every bigram's occurrence
         bigram_freq = {}
         for index in bigram_dict:
+            # For bigrams in each sentence
             for bigram in bigram_dict[index]:
                 if bigram not in bigram_freq:
                     bigram_freq[bigram] = 1
                 else:
                     bigram_freq[bigram] = bigram_freq[bigram] + 1
-
-        # The order of bigram variables
-        bigram_list = list(bigram_set)
+        bigram_list = list(bigram_set)  # the order of bigram variables
         # Use frequency of bigram as its weight
         weight = []
         for i in range(n_bigram):
