@@ -48,60 +48,72 @@ class ContentRealization:
         # elif self.solver == 'parse_tree':
         #     self._parse_tree(scu, topic_id)
 
-    def prune(self, scu):
+    def prune_pipeline(self, scu, prune_pipe):
+        """
+        Prune sentences using method specified in prune_pipe
+        :param scu: list of sentence
+        :param prune_pipe: the order of pruning methods
+        """
+        print('Start pruning ...')
+        for prune_type in prune_pipe:
+            scu = self._prune(scu, prune_type)
+        print('Finish pruning ...')
+        return scu
+
+    def _prune(self, scu, prune_type):
         """
         Prune sentences by removing unnecessary constituents. Modify scu in place.
         :param scu: list of sentence
+        :param prune_type: indicate the type of pruning
         """
         for index, item in enumerate(scu):
             sent = item.content()
-            sent = re.sub(self.parenthesis_re, '', sent).strip(' ')  # remove all contents in a pair of parenthesis
-            sent = re.sub(self.space_re, ' ', sent).strip(' ')
-            tokens = self.nlp(sent)
-            if tokens[0].dep_ == 'advcl' or tokens[0].dep_ == 'prep':
-                # If sentence starts with a short adv clause, remove this clause
-                # Or if sentence starts with a short preposition phrase, remove it as well
-                if ',' in sent[0:100]:
-                    # print('remove:', sent[:sent.find(',')])
-                    # print('original sentence:', sent)
-                    sent = sent[sent.find(',')+1:].strip().capitalize()
-
-            tokens = self.nlp(sent)
-            # Remove apposition
-            for token in tokens:
-                if token.dep_ == 'appos':
-                    same_layer = [x for x in token.head.children]
-                    pos_in_layer = same_layer.index(token)
-                    if pos_in_layer - 1 >= 0 and pos_in_layer + 1 < len(same_layer) and \
-                            same_layer[pos_in_layer-1].dep_ == 'punct' and same_layer[pos_in_layer+1].dep_ == 'punct':
-                        appo_start = same_layer[pos_in_layer-1].i
-                        appo_end = same_layer[pos_in_layer+1].i
-                        print('if:', [x.text for x in tokens[appo_start:appo_end]], 'is removed')
-                        print('       sent:', sent)
-                        sent = tokens[:appo_start].text + tokens[appo_end:].text
-                        print('pruned sent:', sent, '\n ------')
-                        break  # prune only one apposition for each sentence
-                    else:
-                        # Get the subtree of apposition
-                        subtree = [x for x in token.subtree]
-                        if subtree[0].dep_ == 'punct':
-                            appo_start = subtree[0].i
-                        else:
-                            appo_start = subtree[0].i - 1
-                        if subtree[-1].dep_ == 'punct':
-                            appo_end = subtree[-1].i
-                        else:
-                            appo_end = subtree[-1].i + 1
-                        # If the apposition is surrounded by puncs, remove it
-                        if tokens[appo_end].dep_ == 'punct' and tokens[appo_start].dep_ == 'punct':
-                            print('else:', subtree, 'is removed,')
+            if prune_type == 'parenthesis':
+                sent = re.sub(self.parenthesis_re, '', sent).strip(' ')  # remove all contents in a pair of parenthesis
+                sent = re.sub(self.space_re, ' ', sent).strip(' ')
+            elif prune_type == 'advcl':
+                tokens = self.nlp(sent)
+                if tokens[0].dep_ == 'advcl' or tokens[0].dep_ == 'prep':
+                    # If sentence starts with a short adv clause, remove this clause
+                    # Or if sentence starts with a short preposition phrase, remove it as well
+                    if ',' in sent[0:100]:
+                        # print('remove:', sent[:sent.find(',')])
+                        # print('original sentence:', sent)
+                        sent = sent[sent.find(',')+1:].strip().capitalize()
+            elif prune_type == 'apposition':
+                tokens = self.nlp(sent)
+                # Remove apposition
+                for token in tokens:
+                    if token.dep_ == 'appos':
+                        same_layer = [x for x in token.head.children]
+                        pos_in_layer = same_layer.index(token)
+                        if pos_in_layer - 1 >= 0 and pos_in_layer + 1 < len(same_layer) and \
+                                same_layer[pos_in_layer-1].dep_ == 'punct' and same_layer[pos_in_layer+1].dep_ == 'punct':
+                            appo_start = same_layer[pos_in_layer-1].i
+                            appo_end = same_layer[pos_in_layer+1].i
+                            print('\"', tokens[appo_start:appo_end], '\" is removed')
                             print('       sent:', sent)
                             sent = tokens[:appo_start].text + tokens[appo_end:].text
                             print('pruned sent:', sent, '\n ------')
                             break  # prune only one apposition for each sentence
                         else:
-                            # sent = tokens[:appo_start].text + ' ' + tokens[appo_end:].text
-                            print('donot prune')
+                            # Get the subtree of apposition
+                            subtree = [x for x in token.subtree]
+                            if subtree[0].dep_ == 'punct':
+                                appo_start = subtree[0].i
+                            else:
+                                appo_start = subtree[0].i - 1
+                            if subtree[-1].dep_ == 'punct':
+                                appo_end = subtree[-1].i
+                            else:
+                                appo_end = subtree[-1].i + 1
+                            # If the apposition is surrounded by puncs, remove it
+                            if tokens[appo_end].dep_ == 'punct' and tokens[appo_start].dep_ == 'punct':
+                                print(subtree, 'is removed')
+                                print('       sent:', sent)
+                                sent = tokens[:appo_start].text + tokens[appo_end:].text
+                                print('pruned sent:', sent, '\n ------')
+                                break  # prune only one apposition for each sentence
 
             # Re-calculate sentence length
             n_puncs = 0
@@ -233,7 +245,7 @@ class ContentRealization:
         :param scu: list[Sentence]
         :param topic_id: topic id for this docset
         """
-        scu = self.prune(scu)
+        scu = self.prune_pipeline(scu, ['parenthesis', 'advcl', 'apposition'])
         bigram_dict, bigram_set = get_bigrams(scu)
         n_bigram = len(bigram_set)
         n_sent = len(scu)
