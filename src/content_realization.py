@@ -29,7 +29,8 @@ class ContentRealization:
         self.max_length = max_length
         self.lambda1 = lambda1
         self.lambda2 = lambda2
-        self.parenthesis_re = re.compile(r'(\[\S+\])|(\(\S+\))|(\{\S+\})')  # match contents in parenthesis
+        self.parenthesis_re = re.compile(r'(\[.+\])|(\(.+\))|(\{.+\})')  # match contents in parenthesis
+        self.space_re = re.compile(r'\s+')  # match continuous spaces
         self.nlp = spacy.load('en')
 
     def cr(self, scu, topic_id):
@@ -52,16 +53,55 @@ class ContentRealization:
         Prune sentences by removing unnecessary constituents. Modify scu in place.
         :param scu: list of sentence
         """
-        for index, item in scu:
+        for index, item in enumerate(scu):
             sent = item.content()
             sent = re.sub(self.parenthesis_re, '', sent).strip(' ')  # remove all contents in a pair of parenthesis
+            sent = re.sub(self.space_re, ' ', sent).strip(' ')
             tokens = self.nlp(sent)
             if tokens[0].dep_ == 'advcl' or tokens[0].dep_ == 'prep':
                 # If sentence starts with a short adv clause, remove this clause
                 # Or if sentence starts with a short preposition phrase, remove it as well
-                if ',' in sent[0:8]:
-                    print('remove:', sent[:sent.find(',')])
+                if ',' in sent[0:100]:
+                    # print('remove:', sent[:sent.find(',')])
+                    # print('original sentence:', sent)
                     sent = sent[sent.find(',')+1:].strip().capitalize()
+
+            tokens = self.nlp(sent)
+            # Remove apposition
+            for token in tokens:
+                if token.dep_ == 'appos':
+                    same_layer = [x for x in token.head.children]
+                    pos_in_layer = same_layer.index(token)
+                    if pos_in_layer - 1 >= 0 and pos_in_layer + 1 < len(same_layer) and \
+                            same_layer[pos_in_layer-1].dep_ == 'punct' and same_layer[pos_in_layer+1].dep_ == 'punct':
+                        appo_start = same_layer[pos_in_layer-1].i
+                        appo_end = same_layer[pos_in_layer+1].i
+                        print('if:', [x.text for x in tokens[appo_start:appo_end]], 'is removed')
+                        print('       sent:', sent)
+                        sent = tokens[:appo_start].text + tokens[appo_end:].text
+                        print('pruned sent:', sent, '\n ------')
+                        break  # prune only one apposition for each sentence
+                    else:
+                        # Get the subtree of apposition
+                        subtree = [x for x in token.subtree]
+                        if subtree[0].dep_ == 'punct':
+                            appo_start = subtree[0].i
+                        else:
+                            appo_start = subtree[0].i - 1
+                        if subtree[-1].dep_ == 'punct':
+                            appo_end = subtree[-1].i
+                        else:
+                            appo_end = subtree[-1].i + 1
+                        # If the apposition is surrounded by puncs, remove it
+                        if tokens[appo_end].dep_ == 'punct' and tokens[appo_start].dep_ == 'punct':
+                            print('else:', subtree, 'is removed,')
+                            print('       sent:', sent)
+                            sent = tokens[:appo_start].text + tokens[appo_end:].text
+                            print('pruned sent:', sent, '\n ------')
+                            break  # prune only one apposition for each sentence
+                        else:
+                            # sent = tokens[:appo_start].text + ' ' + tokens[appo_end:].text
+                            print('donot prune')
 
             # Re-calculate sentence length
             n_puncs = 0
