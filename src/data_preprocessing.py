@@ -261,7 +261,7 @@ def read_human_judgements(fullCorpus, dir):
                 file_path = os.path.join(dir, file)
                 with open(file_path, 'rb') as f:
                     data = f.read()
-                    docSet._humanSummary.append(data) # load the human summary to the document set
+                    docSet._humanSummary.append(str(data)) # load the human summary to the document set
     return fullCorpus
 
 def generate_corpus(corpus_file, aqua, aqua2, human_judge):
