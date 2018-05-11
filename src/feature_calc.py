@@ -1,4 +1,4 @@
-import data_preprocessing as dp
+import src.data_preprocessing as dp
 import numpy as np
 import scipy as sp
 import nltk
