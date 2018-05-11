@@ -1,4 +1,5 @@
 import src.data_preprocessing as dp
+import src.feature_calc as fc
 import math
 import numpy as np
 import scipy as sp
@@ -149,8 +150,12 @@ if __name__ == "__main__":
 
     training_corpus = dp.generate_corpus(demo_training_corpus_file, aqua, aqua2, human_judge)
     docsetlist = training_corpus.docsetList()
+    word_list_art, word_list_sum, art_matrix, sum_matrix = fc.feature_weight_calc(docsetlist)
+    print("hello")
+    '''
     for docset in docsetlist:
         important_sentences = cs(docset, compression_rate=comprate)
         for sentence in important_sentences:
             print(sentence.content())
         print("\n")
+    '''

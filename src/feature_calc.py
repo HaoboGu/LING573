@@ -2,6 +2,7 @@ import src.data_preprocessing as dp
 import numpy as np
 import scipy as sp
 import nltk
+import math
 
 training_corpus_file = "Data/Documents/training/2009/UpdateSumm09_test_topics.xml"
 demo_training_corpus_file = "test.xml"
@@ -59,9 +60,9 @@ def feature_weight_calc(docsetlist):
     sum_matrix = np.zeros(sum_len)
 
     for i in range(0, art_len):
-        art_matrix[i] = word_dic_article[hash(word_list_art[i])]/word_count_article
+        art_matrix[i] = math.log(word_dic_article[hash(word_list_art[i])]) - math.log(word_count_article)
     for j in range(0, sum_len):
-        sum_matrix[j] = word_dic_summary[hash(word_list_sum[j])]/word_count_summary
+        sum_matrix[j] = math.log(word_dic_summary[hash(word_list_sum[j])]) - math.log(word_count_summary)
     
     return word_list_art, word_list_sum, art_matrix, sum_matrix
 
