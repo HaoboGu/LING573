@@ -144,6 +144,7 @@ def converging(vector1, vector2, difference=converge_standard):
 
 def generate_most_important_sentences(score_list, sentence_list, num):
     maxn = get_max_n(score_list, num)
+    maxn = normalize_score(maxn)
     result = []
     for item in maxn:
         score = item[1]
@@ -153,28 +154,45 @@ def generate_most_important_sentences(score_list, sentence_list, num):
     return result
 
 
-def get_max_n(list, n):
+def normalize_score(score_list):
+    biggest_score = get_max(score_list)[1]
+    for item in score_list:
+        item[1] = item[1] / biggest_score
+    return score_list
+
+
+def get_max_n(score_list, n):
     topn = n
-    if n > len(list)-1:
-        topn = len(list)-1
+    if n > len(score_list)-1:
+        topn = len(score_list)-1
     result = []
 
     for i in range(topn):
-        result.append([i, list[i]])
+        result.append([i, score_list[i]])
     smallest = get_min(result)
-    for i in range(topn, len(list)-1):
-        if list[i] > smallest[1]:
-            result[smallest[0]] = [i, list[i]]
+    for i in range(topn, len(score_list)-1):
+        if score_list[i] > smallest[1]:
+            result[smallest[0]] = [i, score_list[i]]
             smallest = get_min(result)
     return result
 
 
-def get_min(list):
-    smallest = list[0][1]
+def get_max(score_list):
+    biggest = score_list[0][1]
     index = 0
-    for i in range(1, len(list)):
-        if list[i][1] < smallest:
-            smallest = list[i][1]
+    for i in range(1, len(score_list)):
+        if score_list[i][1] > biggest:
+            biggest = score_list[i][1]
+            index = i
+    return [index, biggest]
+
+
+def get_min(score_list):
+    smallest = score_list[0][1]
+    index = 0
+    for i in range(1, len(score_list)):
+        if score_list[i][1] < smallest:
+            smallest = score_list[i][1]
             index = i
     return [index, smallest]
 
