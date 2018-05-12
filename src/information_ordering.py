@@ -67,7 +67,78 @@ def write_to_file(docset,sent_list,output):
         for s in sent_list:
             f1.write(re.sub(r'\n',' ',s.content())+os.linesep)
 
+
             
+            
+def calc_chro_exp(important_sentences):
+    """
+    ========================
+    DESCRIPTION: this function takes an unsorted list of sentences and calculate the chronological expert
+    ========================
+    INPUT: important_sentences: list[sentence]
+    ========================
+    OUTPUT: chro_exp: chronological expert
+    ========================
+    """
+    chro_exp = {}
+    for i in important_sentences:
+        if i not in chro_exp:
+            chro_exp[i] = {}
+        for j in important_sentences:
+            #if j not in chro_exp[i] and i.index() != j.index():
+            chro_exp[i][j] = 0
+    for i in chro_exp:
+        for j in chro_exp[i]:
+            if i.doctime() < j.doctime():
+                chro_exp[i][j] = 1
+            elif i.idCode() == j.idCode() and i.index() < j.index():
+                chro_exp[i][j] = 1
+            elif i.doctime() == j.doctime() and i.idCode() == j.idCode():
+                chro_exp[i][j] = 0.5
+            else:
+                chro_exp[i][j] = 0
+    return(chro_exp)
+
+
+def sent_ordering(X,chro_exp):
+    """
+    ========================
+    DESCRIPTION: this function takes an unsorted list of sentences and sort the sentences
+    ========================
+    INPUT: X: list[sentence]
+    ========================
+    OUTPUT: rho: sorted sentence list
+    ========================
+    """
+    V = X.copy()
+    Q = []
+    pi = {}
+    rho = {}
+    for i in V:
+        pi[i] = 0
+        rho[i] = 0
+    for i in V:
+        pi_i = 0
+        for j in chro_exp[i]:
+            pi_i+=chro_exp[i][j]
+        for j in chro_exp[i]:
+            pi_i-=chro_exp[j][i]
+        pi[i] = pi_i
+    while len(pi)!=0:
+        t = max(pi, key=pi.get)
+        rho[t] = len(V)
+        V.remove(t)
+        new_pi = {}
+        for i in pi:
+            if i != t:
+                new_pi[i] = pi[i]
+        pi = new_pi
+        Q.append(t)
+        for i in V:
+            pi[i] = pi[i]+chro_exp[t][i]-chro_exp[i][t]
+    return(rho)
+
+
 
 def io_wrapper(training_corpus_file,aqua,aqua2,human_judge,output):
     """
