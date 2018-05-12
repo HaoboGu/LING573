@@ -43,9 +43,10 @@ def cs(docset, compression_rate, model_type):
 
     elif op.eq(model_name, KL_DIVERGENCE):
         new_sentence_list = replace_sentence_token_dict(allsentencelist, model_type)
-        sentence_matrix = sentence2matrix(new_sentence_list, docset_tokenDict)
+        # sentence_matrix = sentence2matrix(new_sentence_list, docset_tokenDict)
         # Q, R, P = sp.linalg.qr(sentence_matrix)
-        important_score_vector = kl_score(sentence_matrix)
+        # important_score_vector = kl_score(sentence_matrix)
+        important_score_vector = get_sentence_score(new_sentence_list)
 
     output_sen_num = int(len(allsentencelist) * compression_rate)
     important_sentences = generate_most_important_sentences(important_score_vector, allsentencelist, output_sen_num)
@@ -223,18 +224,38 @@ def replace_sentence_token_dict(sentence_list, model_type):
         sentence = sentence_list[i]
         token_dict = sentence.tokenDict()
         new_token_dict = {}
+        amount = 0
         for token in token_dict.keys():
-            ag = 0.0
-            ga = 0.0
-            if token in kl_ag:
+            ag = 0
+            ga = 0
+            inag = token in kl_ag
+            inga = token in kl_ga
+            if inag:
                 ag = kl_ag[token]
-            if token in kl_ga:
+            if inga:
                 ga = kl_ga[token]
-            new_token_dict[token] = (ga - ag) / 2.0
-        new_sent = dp.sentence(sentence.idCode(), sentence.content(), sentence.index(), sentence.score(),
+            score = (ga - ag) / 2.0
+            new_token_dict[token] = score
+            if inag and inga:
+                amount += 1
+        '''
+        if amount == 0:
+            score = 0
+        else:
+            score = sum(new_token_dict.values()) / amount
+        '''
+        score = sum(new_token_dict.values()) / len(new_token_dict)
+        new_sent = dp.sentence(sentence.idCode(), sentence.content(), sentence.index(), score,
                                sentence.length(), new_token_dict, sentence.doctime())
         new_sent_list.append(new_sent)
     return new_sent_list
+
+
+def get_sentence_score(sentence_list):
+    score_list = []
+    for sentence in sentence_list:
+        score_list.append(sentence.score())
+    return score_list
 
 
 def train_model(corpus, model_type):
@@ -251,7 +272,7 @@ if __name__ == "__main__":
     type2 = "KL_Divergence"
     training_corpus = dp.generate_corpus(demo_training_corpus_file, aqua, aqua2, human_judge)
     docsetlist = training_corpus.docsetList()
-    cs_model = train_model(training_corpus, type1)
+    cs_model = train_model(training_corpus, type2)
     for docset in docsetlist:
         important_sentences = cs(docset, comprate, cs_model)
         for sentence in important_sentences:
