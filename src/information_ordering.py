@@ -107,7 +107,7 @@ def sent_ordering(X,chro_exp):
     ========================
     INPUT: X: list[sentence]
     ========================
-    OUTPUT: rho: sorted sentence list
+    OUTPUT: sorted_list: sorted sentence list
     ========================
     """
     V = X.copy()
@@ -136,7 +136,8 @@ def sent_ordering(X,chro_exp):
         Q.append(t)
         for i in V:
             pi[i] = pi[i]+chro_exp[t][i]-chro_exp[i][t]
-    return(rho)
+    sorted_list = sorted(rho, key=rho.get, reverse=True)
+    return(sorted_list)
 
 
 

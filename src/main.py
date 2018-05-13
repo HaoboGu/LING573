@@ -29,16 +29,18 @@ if __name__ == "__main__":
     converge_standard = 0.001  # Used to judge if the score is converging
 
     print("Reading Corpus...")
+    type2 = "KL_Divergence"
     training_corpus = dp.generate_corpus(training_corpus_file, aqua, aqua2, human_judge)
     docset_list = training_corpus.docsetList()
-    docset_dic = {}
-
-    for docset in docset_list:  # traverse through all document sets
+    cs_model = cs.train_model(training_corpus, type2)
+    for docset in docset_list:
         print("Processing docset", docset.idCode())
-        important_sentences = cs.cs(docset, compression_rate=comp_rate)  # content selection
-        sent_list = io.sort_sentence_list(important_sentences)  # sort important sentences
+        important_sentences = cs.cs(docset, comp_rate, cs_model)
+        chro_exp = io.calc_chro_exp(important_sentences)
+        sent_list = io.sent_ordering(important_sentences, chro_exp)
         content_realization = cr.ContentRealization(solver="improved_ilp", lambda1=0.5, lambda2=0.5,
                                                     output_folder_name='D3',
-                                                    prune_pipe=['apposition', 'advcl', 'parenthesis'])
+                                                    prune_pipe=[])
         content_realization.cr(sent_list, docset.idCode())
+
     print("Complete!")

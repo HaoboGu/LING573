@@ -156,7 +156,7 @@ class ContentRealization:
         :param topic_id: topic id of this doc
         """
         summary = self._get_summarizations(scu)
-        write(summary, topic_id, over_write=True)
+        write(summary, topic_id, output_folder_name=self.output_folder_name, over_write=True)
 
     def _linear_prog(self, scu, topic_id):
         """
@@ -241,7 +241,7 @@ class ContentRealization:
         summary = [sent.content() for sent in np.array(scu)[indices > 0.1]]
 
         # Write result
-        write(summary, topic_id, output_folder_name='D3', over_write=True)
+        write(summary, topic_id, output_folder_name=self.output_folder_name, over_write=True)
 
     def _improved_ilp(self, scu, topic_id):
         """
