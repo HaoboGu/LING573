@@ -18,6 +18,8 @@ LEXRANK = "LexRank"
 KL_DIVERGENCE = "KL_Divergence"
 COMBINED = "Combined"
 
+SENT_LEN_THRESHOLD = 8
+
 
 class model:
 
@@ -58,7 +60,7 @@ def cs(docset, compression_rate, model_type):
         # Q, R, P = sp.linalg.qr(sentence_matrix)
         # important_score_vector = kl_score(sentence_matrix)
         important_score_vector2 = get_sentence_score(new_sentence_list)
-        important_score_vector2 = smooth(important_score_vector2)
+        # important_score_vector2 = smooth(important_score_vector2)
         important_score_vector = combine_two_method(important_score_vector1, important_score_vector2)
 
     output_sen_num = int(len(allsentencelist) * compression_rate)
@@ -176,6 +178,7 @@ def converging(vector1, vector2, difference=converge_standard):
 
 
 def generate_most_important_sentences(score_list, sentence_list, num):
+    apply_threshold(score_list, sentence_list)
     maxn = get_max_n(score_list, num)
     result = []
     for item in maxn:
@@ -184,6 +187,13 @@ def generate_most_important_sentences(score_list, sentence_list, num):
         sent._score = score
         result.append(sent)
     return result
+
+
+def apply_threshold(score_list, sentence_list):
+    for i in range(len(sentence_list)):
+        sentence = sentence_list[i]
+        if sentence.length() < SENT_LEN_THRESHOLD:
+            score_list[i] = -2
 
 
 def normalize_score(score_list):
@@ -230,6 +240,7 @@ def get_max_score(score_list):
             biggest = score_list[i]
             index = i
     return [index, biggest]
+
 
 def get_min_score(score_list):
     smallest = score_list[0]
