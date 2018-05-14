@@ -76,6 +76,8 @@ class ContentRealization:
                 sent = re.sub(self.space_re, ' ', sent).strip(' ')
             elif prune_type == 'advcl':
                 tokens = self.nlp(sent)
+                if len(tokens) == 0:
+                    continue
                 if tokens[0].dep_ == 'advcl' or tokens[0].dep_ == 'prep':
                     # If sentence starts with a short adv clause, remove this clause
                     # Or if sentence starts with a short preposition phrase, remove it as well
@@ -85,6 +87,8 @@ class ContentRealization:
                         sent = sent[sent.find(',')+1:].strip().capitalize()
             elif prune_type == 'apposition':
                 tokens = self.nlp(sent)
+                if len(tokens) == 0:
+                    continue
                 # Remove apposition
                 for token in tokens:
                     if token.dep_ == 'appos':
@@ -321,6 +325,7 @@ class ContentRealization:
         # ilp_model.writeLP('ilp_model')  # write ilp model to file
         ilp_model.solve()
         indices = np.array([sentences[key].value() for key in sentences])
+        indices[indices==None] = 0
         summary = [sent.content() for sent in np.array(scu)[indices > 0.1]]
         # Write result
         write(summary, topic_id, output_folder_name=self.output_folder_name, over_write=True)
