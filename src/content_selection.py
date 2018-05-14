@@ -16,6 +16,7 @@ converge_standard = 0.001  # Used to judge if the score is converging
 
 LEXRANK = "LexRank"
 KL_DIVERGENCE = "KL_Divergence"
+COMBINED = "Combined"
 
 
 class model:
@@ -48,10 +49,42 @@ def cs(docset, compression_rate, model_type):
         # important_score_vector = kl_score(sentence_matrix)
         important_score_vector = get_sentence_score(new_sentence_list)
 
+    elif op.eq(model_name, COMBINED):
+        sentence_matrix = sentence2matrix(allsentencelist, docset_tokenDict)
+        sentence_similarity = calculate_sentence_similarity(sentence_matrix)
+        important_score_vector1 = LexRank(sentence_similarity)
+        new_sentence_list = replace_sentence_token_dict(allsentencelist, model_type)
+        # sentence_matrix = sentence2matrix(new_sentence_list, docset_tokenDict)
+        # Q, R, P = sp.linalg.qr(sentence_matrix)
+        # important_score_vector = kl_score(sentence_matrix)
+        important_score_vector2 = get_sentence_score(new_sentence_list)
+        important_score_vector2 = smooth(important_score_vector2)
+        important_score_vector = combine_two_method(important_score_vector1, important_score_vector2)
+
     output_sen_num = int(len(allsentencelist) * compression_rate)
     important_sentences = generate_most_important_sentences(important_score_vector, allsentencelist, output_sen_num)
     return important_sentences
 
+
+def test_ave_score(docset, model_type):
+    allsentencelist = generate_sentencelist(docset)
+    docset_tokenDict = docset.tokenDict()
+    sentence_matrix = sentence2matrix(allsentencelist, docset_tokenDict)
+    sentence_similarity = calculate_sentence_similarity(sentence_matrix)
+    important_score_vector1 = LexRank(sentence_similarity)
+    new_sentence_list = replace_sentence_token_dict(allsentencelist, model_type)
+    important_score_vector2 = get_sentence_score(new_sentence_list)
+    sum1 = sum(important_score_vector1)
+    sum2 = sum(important_score_vector2)
+    count = len(important_score_vector1)
+    return sum1, sum2, count
+
+
+def combine_two_method(score_list1, score_list2):
+    score = []
+    for i in range(len(score_list1)):
+        score.append(score_list1[i] * 0.5 + score_list2[i] * 0.5)
+    return score
 
 # This function generates a sentence list of all sentences in a given docset.
 # list[data_preprocessing.sentence] generate_sentencelist(data_preprocesing.docSet)
@@ -112,7 +145,7 @@ def LexRank(simi_matrix):
         from_vector = to_vector
         to_vector = np.matmul(T_tranprob_matrix, from_vector)
 
-    return to_vector
+    return normalize_score(to_vector)
 
 
 def kl_score(sentence_matrix):
@@ -144,7 +177,6 @@ def converging(vector1, vector2, difference=converge_standard):
 
 def generate_most_important_sentences(score_list, sentence_list, num):
     maxn = get_max_n(score_list, num)
-    maxn = normalize_score(maxn)
     result = []
     for item in maxn:
         score = item[1]
@@ -155,9 +187,22 @@ def generate_most_important_sentences(score_list, sentence_list, num):
 
 
 def normalize_score(score_list):
-    biggest_score = get_max(score_list)[1]
-    for item in score_list:
-        item[1] = item[1] / biggest_score
+    biggest_score = get_max_score(score_list)[1]
+    smallest_score = get_min_score(score_list)[1]
+    for i in range(len(score_list)):
+        if score_list[i] > 0:
+            score_list[i] = score_list[i] / biggest_score
+        else:
+            score_list[i] = - score_list[i] / smallest_score
+    return score_list
+
+
+def smooth(score_list):
+    for i in range(len(score_list)):
+        if score_list[i] > 0:
+            score_list[i] = score_list[i] * (2 - 1 * score_list[i])
+        else:
+            score_list[i] = score_list[i] * (2 + 1 * score_list[i])
     return score_list
 
 
@@ -177,14 +222,23 @@ def get_max_n(score_list, n):
     return result
 
 
-def get_max(score_list):
-    biggest = score_list[0][1]
+def get_max_score(score_list):
+    biggest = score_list[0]
     index = 0
     for i in range(1, len(score_list)):
-        if score_list[i][1] > biggest:
-            biggest = score_list[i][1]
+        if score_list[i] > biggest:
+            biggest = score_list[i]
             index = i
     return [index, biggest]
+
+def get_min_score(score_list):
+    smallest = score_list[0]
+    index = 0
+    for i in range(1, len(score_list)):
+        if score_list[i] < smallest:
+            smallest = score_list[i]
+            index = i
+    return [index, smallest]
 
 
 def get_min(score_list):
@@ -263,6 +317,7 @@ def replace_sentence_token_dict(sentence_list, model_type):
             score = sum(new_token_dict.values()) / amount
         '''
         score = sum(new_token_dict.values()) / len(new_token_dict)
+        # score = sum(new_token_dict.values())
         new_sent = dp.sentence(sentence.idCode(), sentence.content(), sentence.index(), score,
                                sentence.length(), new_token_dict, sentence.doctime())
         new_sent_list.append(new_sent)
@@ -273,7 +328,7 @@ def get_sentence_score(sentence_list):
     score_list = []
     for sentence in sentence_list:
         score_list.append(sentence.score())
-    return score_list
+    return normalize_score(score_list)
 
 
 def train_model(corpus, model_type):
@@ -283,16 +338,33 @@ def train_model(corpus, model_type):
     elif op.eq(model_type, KL_DIVERGENCE):
         word_list_art, word_list_sum, art_matrix, sum_matrix = fc.feature_weight_calc(docsetlist)
         return model(model_type, word_list_art, word_list_sum, art_matrix, sum_matrix)
+    elif op.eq(model_type, COMBINED):
+        word_list_art, word_list_sum, art_matrix, sum_matrix = fc.feature_weight_calc(docsetlist)
+        return model(model_type, word_list_art, word_list_sum, art_matrix, sum_matrix)
 
 
 if __name__ == "__main__":
     type1 = "LexRank"
     type2 = "KL_Divergence"
+    type3 = "Combined"
     training_corpus = dp.generate_corpus(demo_training_corpus_file, aqua, aqua2, human_judge)
     docsetlist = training_corpus.docsetList()
-    cs_model = train_model(training_corpus, type2)
+    cs_model = train_model(training_corpus, type3)
+
     for docset in docsetlist:
         important_sentences = cs(docset, comprate, cs_model)
         for sentence in important_sentences:
             print(sentence.content())
         print("\n")
+    '''
+    s1 = 0
+    s2 = 0
+    s3 = 0
+    for docset in docsetlist:
+        sum1, sum2, count = test_ave_score(docset, cs_model)
+        s1 += sum1
+        s2 += sum2
+        s3 += count
+    print(str(s1/s3))
+    print(str(s2/s3))
+    '''
