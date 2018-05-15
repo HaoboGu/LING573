@@ -262,19 +262,25 @@ class ContentRealization:
         # Calculate weights in objective function
         # Count every bigram's occurrence
         bigram_freq = {}
+        delta = 0.001 
         for index in bigram_dict:
-            # For bigrams in each sentence
+            # For bigrams in each sentence[index]
             for bigram in bigram_dict[index]:
+                # Bigrams in important sentences have higher weights
                 if bigram not in bigram_freq:
-                    bigram_freq[bigram] = 1
+                    bigram_freq[bigram] = 1 + delta * (n_sent - index)
                 else:
-                    bigram_freq[bigram] = bigram_freq[bigram] + 1
+                    bigram_freq[bigram] = bigram_freq[bigram]  + 1 + delta * (n_sent - index)
         bigram_list = list(bigram_set)  # the order of bigram variables
         # Use frequency of bigram as its weight
         weight = []
         for i in range(n_bigram):
             weight.append(bigram_freq[bigram_list[i]])
-        weight = np.concatenate((np.array(weight), np.zeros(n_sent)), axis=0)  # add s_j after c_i
+        weight_s = np.zeros(n_sent)
+        for i in range(n_sent):
+            # Give a very small weight to every sentence
+            weight_s[i] = delta * (n_sent - i)
+        weight = np.concatenate((np.array(weight), weight_s), axis=0)  # add s_j after c_i
 
         # Calculate coefs
         # Variable: c_i, s_j
@@ -323,7 +329,7 @@ class ContentRealization:
                                     [coefs[key2 + n_bigram] * sentences[key2] for key2 in sentences]) <= 0
 
         # ilp_model.writeLP('ilp_model')  # write ilp model to file
-        ilp_model.solve()
+        ilp_model.solve(pulp.PULP_CBC_CMD())
         indices = np.array([sentences[key].value() for key in sentences])
         indices[indices==None] = 0
         summary = [sent.content() for sent in np.array(scu)[indices > 0.1]]

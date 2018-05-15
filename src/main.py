@@ -30,9 +30,10 @@ if __name__ == "__main__":
 
     print("Reading Corpus...")
     type2 = "KL_Divergence"
+    type3 = "Combined"
     training_corpus = dp.generate_corpus(training_corpus_file, aqua, aqua2, human_judge)
     docset_list = training_corpus.docsetList()
-    cs_model = cs.train_model(training_corpus, type2)
+    cs_model = cs.train_model(training_corpus, type3)
     for docset in docset_list:
         print("Processing docset", docset.idCode())
         important_sentences = cs.cs(docset, comp_rate, cs_model)

@@ -85,7 +85,7 @@ def test_ave_score(docset, model_type):
 def combine_two_method(score_list1, score_list2):
     score = []
     for i in range(len(score_list1)):
-        score.append(score_list1[i] * 0.5 + score_list2[i] * 0.5)
+        score.append(score_list1[i] * 0.25 + score_list2[i] * 0.75)
     return score
 
 # This function generates a sentence list of all sentences in a given docset.
