@@ -21,6 +21,12 @@
 \usepackage{amsmath}
 \usepackage{latexsym}
 \usepackage{graphicx}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+
+\makeatletter
+\def\BState{\State\hskip-\ALG@thistlm}
+\makeatother
 
 %\setlength\titlebox{5cm}
 
@@ -81,9 +87,62 @@ Generate a 1-D vector $P$,  of length $m$ to record the score of each sentence, 
 
 \subsection{Information Ordering}
 
-Given a list of sentences selected by Content Selection procedure and salient scores associated, the baseline model of Information Ordering takes inter-document chronology and intra-document cohesion factors into account to generate a sorted list. Firstly, our model sorts the sentences by their chronological order, the dates of publication of the document where a particular sentence is extracted. The chronology information has been recorded in the data preprocessing part and would sort the sentences from different documents. Secondly, within the same document, sentences are ordered linearly by their positions in the document to impose cohesion. The position information has also been recorded using indices.\\
+We implement the method of experts, with a slight modification, to provide an ordered list of selected sentences with more readability and meaningfulness. Based on the work by Bollegala et al., we choose the chronological expert as the ordering strategy\cite{Bollegala:12}. This sentence ordering procedure proposed in this paper contains five experts in total, but we only adopt the chronological expert for now, and we will consider implementing the rest in the next deliverable. 
+
 \indent
-Finally, the Information Ordering part would produce a sorted list of sentences with respect to the chronology information of individual documents and the position information of the sentence in the context. 
+Define an expert $e$ by a pairwise preference function as follows:
+\begin{equation}
+PREF_e(u,v,Q)\in[0,1]
+\end{equation}
+where $u$ and $v$ are two sentences to order, and $Q$ is the set of sentences that has been ordered so far by some ordering algorithm. Note that the cardinality of $Q$ is 0 when all sentences are unordered. Also, it is worth noting that preference of $u$ to $v$ is not necessarily the same as the preference of $v$ to $u$. 
+
+\indent
+Chronological expert orders the sentences in chronological order of publication date, which is defined as follows:
+\tiny
+\begin{equation}
+PREF_{chro}(u,v,Q)=\begin{cases}
+				1 & T(u) < T(v)\\
+				1 & [D(u)=D(v)]\wedge[N(u)<N(v)]\\
+				0.5 & [T(u)=T(v)]\wedge[D(u)\ne D(v)]\\
+				0 & otherwise
+				\end{cases}
+\end{equation}
+\normalsize
+where $T(u)$ is the publication data of the sentence $u$, $D(u)$ is the unique identification code of the document to which the sentence $u$ belongs and $N(u)$ is the in-text index of the sentence $u$ in its document.
+
+\indent
+By computing chronological preference of every pair of sentences, we then use the sentence ordering algorithm presented in the same paper to produce the final order of sentences. The algorithm is given as follows:
+
+\begin{algorithm}
+\caption{Sentence Ordering Algorithm.}\label{euclid}
+ \hspace*{\algorithmicindent} \textbf{Input:} A set of $X$ of unordered sentences and a preference function $PREF_{chro}(u,v,Q)$\\
+ \hspace*{\algorithmicindent} \textbf{Output:} Ranking score $\hat{\rho}{(t)}$ of each sentence $t\in X$
+\begin{algorithmic}[1]
+\Procedure{Ordering}{}
+\State $V \gets X$
+\State $Q \gets \emptyset$
+\For {each $v\in V$}
+\State $\pi(v)=\sum_{u\in V}PREF_{chro}(v,u,Q)-\sum_{u\in V}PREF_{chro}(u,v,Q)$
+\EndFor
+\While {$V\ne Q$}
+\State $t=argmax_{u\in V}\pi(u)$
+\State $\hat{\rho}(t)=|V|$
+\State $V=V-\{t\}$
+\State $Q=Q+\{t\}$
+\For {each $v\in V$}
+\State {$\pi(v)=\pi(v)+PREF_{chro}(t,v,Q)-PREF_{chro}(v,t,Q)$}
+\EndFor
+\EndWhile
+\Return $\hat{\rho}$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\indent
+Basically, this ordering algorithm regards the preference function as a directed weighted graph where initially the set of vertices $V$ is equal to the set of sentences $X$, and each edge $u\rightarrow v$ has the weight equal to the preference. Then each vertex $v\in V$ is assigned a potential value $\pi(v)$, which is the sum of outgoing edges minus sum of ingoing edges. This ordering algorithm is a greedy algorithm that orders a certain node $t$ with maximal potential and assigns a rank equal to the cardinality of the set $V$, which then is removed from the graph; also the potential value $\pi$ of the remaining vertices are updated accordingly. This algorithm continues until the graph is empty, i.e., all sentences are ordered. 
+
+\indent
+This paper also proposed an algorithm for learning weights for each experts. We will implement this alongside with all other experts in the next deliverable.
 
 \subsection{Content Realization}
 
@@ -163,6 +222,12 @@ For the baseline system, we employed an unsupervised, extraction-based algorithm
 This deliverable is our first team project for this course, and also our first trial towards building an automatic document summarization system. All of our four team members work well together, with each member focusing on a specific module and we connect the system together in the end to make it work. Our project delivers a baseline system focused on unsupervised, extraction-based and connectivity-focused summarization system. The performance of our system does left a lot improving space for us to work in the future and we want to introduce several supervised learning algorithms to make the system better.
 
 \begin{thebibliography}{}
+\bibitem[\protect\citename{Bollegala, Okazaki and Ishizuka}2012]{Bollegala:12}
+Danushka~Bollegala, Naoaki~Okazaki and Mitsuru~Ishizuka
+\newblock 2012.
+\newblock {\em A Preference Learning Approach to Sentence Ordering for Multi-document Summarization.}
+\newblock{Information Sciences 2012, 217:78-95.}
+
 \bibitem[\protect\citename{Galanis, Lampouras and Androutsopoulos}2012]{Galanis:12}
 Dimitrios~Galanis, Gerasimos~Lampouras and Ion~Androutsopoulos.
 \newblock 2012.
