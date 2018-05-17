@@ -184,6 +184,8 @@ Hence, the final ILP problem we established for content realization is:
 \indent
 By maximizing the target function, a set of sentences is generated. Finally, those generated sentences are organized to the summary using the order we got from information ordering module.
 
+Besides ILP programming, we also implemented a sentence compression module by removing unnecessary elements in the sentence. Three types of elements are removed from sentences: clauses starting with an adverb, contents in a pair of parenthesis and appositions. A regular expression is used to remove contents in a pair of parenthesis. For the other two constituents, we first parse the sentence using spacy dependency parser. If a transition is recognized as "advcl", which indicates the leading word of this clause is an adverb,  the subtree under this transition is removed. Similarly, if a transition is recognized as "appo", which indicates that the subtree under this transition represents an apposition, then this subtree is pruned. 
+
 \section{Results}
 
 We tested our code on the \texttt{training} and \texttt{devtest} dataset and generated two different sets of summary texts. Although our current baseline model does not require additional time for model training, it still takes a while to compute the score matrices and optimize the target function in the Content Selection and Content Realization module. After that, we used the \texttt{ROUGE} script to compare the generated summaries and the human summaries (as gold standard), and we get the following results.
@@ -212,10 +214,25 @@ ROUGE-4 & 0.00847 & 0.01224   & 0.00997 \\ \hline
 \end{tabular}
 \end{table}
 
+\begin{table}[h!]
+\centering
+\caption{ROUGE for different prune methods on \texttt{devtest}}
+\begin{tabular}{|l|l|l|l|}
+\hline
+Recall   & advcl  & apposition & parenthesis \\ \hline
+ROUGE-1 & 0.24018 & 0.23915   & 0.23218 \\ \hline
+ROUGE-2 & 0.06411 & 0.06158   & 0.06145 \\ \hline
+ROUGE-3 & 0.01943 & 0.01881   & 0.01874 \\ \hline
+ROUGE-4 & 0.00697 & 0.00588   & 0.00607 \\ \hline
+\end{tabular}
+\end{table}
+
 \section{Discussion}
 Frankly speaking, from the results shown in the above tables, this is not a satisfying system for the task. The performance indicators, namely the recall, precision and F-score for each  \texttt{ROUGE} categories, are not good enough to deliver a readable and comprehensible machine-generated summary. As stated in the specification of this deliverable, this is a baseline automatic document summarization system focused primarily on connectivity and efficiency and we think our project delivers the goal and makes the system work without incurring significant problems.\\
 \indent
 For the baseline system, we employed an unsupervised, extraction-based algorithm in all three major parts of the summary generation. It does help our team to generate the summaries relatively quick and without training model, there is no risk for overfitting the training dataset. However, without a proper training process, our model might lose lots of its accuracy and credibility. In the future, our team might want to use a supervised algorithm to perform the training process first and then uses a trained model to generate summaries from the \texttt{devtest} and \texttt{evaltest} datasets. 
+
+Unfortunately, all three compression methods have negative affect, based on ROUGE score. It seems that the removed constituents still contain useful information, simply removing them is not a good choice for sentence compression.  
 
 \section{Conclusion}
 
