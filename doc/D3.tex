@@ -229,8 +229,6 @@ Hence, the final ILP problem we established for content realization is:
 \indent
 By maximizing the target function, a set of sentences is generated. Finally, those generated sentences are organized to the summary using the order we got from information ordering module.
 
-Besides ILP programming, we also implemented a sentence compression module by removing unnecessary elements in the sentence. Three types of elements are removed from sentences: clauses starting with an adverb, contents in a pair of parenthesis and appositions. A regular expression is used to remove contents in a pair of parenthesis. For the other two constituents, we first parse the sentence using spacy dependency parser. If a transition is recognized as "advcl", which indicates the leading word of this clause is an adverb,  the subtree under this transition is removed. Similarly, if a transition is recognized as "appo", which indicates that the subtree under this transition represents an apposition, then this subtree is pruned. 
-
 \section{Results}
 
 We trained our model on the training dataset and test on the devtest dataset. After that, we used the ROUGE script to compare the generated summaries and the human summaries (as gold standard), and we get the following results.
@@ -247,11 +245,7 @@ ROUGE-4 & 0.00746 & 0.00768   & 0.00755 \\ \hline
 \end{tabular}
 \end{table}\\
 \indent
-Our improved system performs far better than our original system, except the Rouge-1 Recall score. The improvement rate is shown below:
-\begin{center}
-\includegraphics[width=0.45\textwidth]{perc.png}
-\end{center}
-
+Also, we tried several different prune methods in the Content Realization module, including removing clauses starting with an adverb, removing appositions, removing contents in parenthesis. Although these methods do not improve the system performance significantly, we want to include the results below for future reference.
 \begin{table}[h!]
 \centering
 \caption{ROUGE for different prune methods on \texttt{devtest}}
@@ -263,14 +257,19 @@ ROUGE-2 & 0.06411 & 0.06158   & 0.06145 \\ \hline
 ROUGE-3 & 0.01943 & 0.01881   & 0.01874 \\ \hline
 ROUGE-4 & 0.00697 & 0.00588   & 0.00607 \\ \hline
 \end{tabular}
-\end{table}
+\end{table}\\
+\indent
+Our improved system performs far better than our original system, except the Rouge-1 Recall score. The improvement rate is shown below:
+\begin{center}
+\includegraphics[width=0.45\textwidth]{perc.png}
+\end{center}
 
 \section{Discussion}
 Based on the improvement chart above, our system improves significantly in Rouge-4 and Rouge-3 standards. However, it does not improve that much in Rouge-1 standard. \\
 \indent
 Although the improvements of our current system are significant, there are some system flaws that we currently cannot solve. The first problem is that for each time of summarization generation, our system would generate slightly different summaries for a small subset of the test dataset, resulting in a small fluctuation of the ROUGE scores. The problem resulted from the ILP algorithm we used in the Content Realization module. On some occasions, there might be more than 1 solution for the optimization problem and the system would randomly select one optimal sentence for construction. We expect to solve the randomness problem when we improve the Content Realization part.
-
-Unfortunately, all three compression methods have negative effect, based on ROUGE score. It seems that the removed constituents still contain useful information, simply removing them is not a good choice for sentence compression.  
+\indent
+Another problem is that this improved system is still extraction-based and does not modify sentence content or combine different sentences. An abstraction-based system would be more plausible in such task and more similar to the thinking of human beings. We might want to modify our Content Realization part to see if we can build an abstraction-based system.
 
 \section{Conclusion}
 
