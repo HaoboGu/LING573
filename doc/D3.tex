@@ -109,10 +109,10 @@ The KL model needs a training stage before test. We build two 1-D feature vector
 \indent
 The next step is to calculate the KL score for every word appeared in both articles and summaries in the training data. According to Hong’s (2014) research , we calculate both $KL(S||A)$ and $KL(A||S)$ based on the formulas below: 
 \begin{equation}
-KL(S||A)(w) = \frac{Pr_S(w)}{\ln(Pr_S(w)/Pr_A(w))}
+KL(S||A)(w) = Pr_S(w)\ln\frac{Pr_S(w)}{Pr_A(w)}
 \end{equation}
 \begin{equation}
-KL(A||S)(w) = \frac{Pr_A(w)}{\ln(Pr_A(w)/Pr_S(w))}
+KL(A||S)(w) = Pr_A(w)\ln\frac{Pr_A(w)}{Pr_S(w)}
 \end{equation}
 In addition, the value of both $KL(S||A)(w)$ and $KL(A||S)(w)$ will be zero, if either \emph{Pr$_S$(w)} is zero or \emph{Pr$_A$(w)} is zero. \\
 \indent
@@ -123,12 +123,12 @@ KL(w) = \frac{(KL(S||A)(w) - KL(A||S)(w))}{2}
 \indent
 We store the KL score of every word appearing in the training articles and summaries in a dictionary. Hence, for every word in a given sentence $s$ from test articles, we can get the word's KL score from the dictionary. Then, we will calculate the KL score of that sentence by averaging the KL score of all words. 
 \begin{equation}
-KL(s) = \frac{\sum_{w_i \in s}\displaystyle KL(w_i)}{length(s)}
+KL(s) = \frac{\displaystyle\sum_{w_i \in s} KL(w_i)}{length(s)}
 \end{equation}
 \indent
-Now, we find a way to calculate the KL score of a sentence, and the bigger the KL score is, the more likely that words in the sentence will appear in the summary, so that the more important the sentence will be. Therefore, for every sentence in the input document set, we can calculate their KL score and normalize them by the highest KL score of the sentence. The normalized KL score will be the importance score for that sentence.\\ 
+Now, we find a way to calculate the KL score of a sentence, and the bigger the KL score is, the more likely these words in the sentence will appear in the summary, so that the more important the sentence will be. Therefore, for every sentence in the input document set, we can calculate their KL score and normalize them by the highest KL score of the sentence. The normalized KL score will be the importance score for that sentence.\\ 
 \indent
-Finally, we generate a 1-D vector $P$,  of length $m$ to record the score of each sentence, in which the $i^{th}$ entry represents the score for the $i^{th}$ sentence. The sentence score is determined by a weighted average of both the LexRank score and KL score. By several trials, we settled down using the weights as 0.25 LexRank Score : 0.75 KL score.\\
+Finally, we generate a 1-D vector $P$,  of length $m$ to record the score of each sentence, in which the $i^{th}$ entry represents the score for the $i^{th}$ sentence. The sentence score is determined by a weighted average of both the LexRank score and KL score. By several trials, we settled down using the weights as 0.25 LexRank Score : 0.75 KL score. In order to avoid short sentences, we remove sentences with length less than 8 words from our output list. \\
 
 \subsection{Information Ordering}
 
@@ -273,7 +273,7 @@ Another problem is that this improved system is still extraction-based and does 
 
 \section{Conclusion}
 
-We employed both unsupervised and supervised models in this improved system. The Content Selection part combines LexRank model with KL divergence to calculate the sentence scores. The Information Ordering part uses a modified version of experts method to sort the sentences and the Content Realization part uses ILP too generate the final summary. \\
+We employed both unsupervised and supervised models in this improved system. The Content Selection part combines LexRank model with KL divergence to calculate the sentence scores. The Information Ordering part uses a modified version of experts method to sort the sentences and the Content Realization part uses ILP to generate the final summary. \\
 \indent
 Our improved automatic summarization system performs significantly better than our baseline system, especially for longer word sequences since the improvements on Rouge-4 and Rouge-3 are more significant. We expect to solve the randomness problem in our next deliverable.
 
@@ -288,7 +288,7 @@ Our improved automatic summarization system performs significantly better than o
 Dimitrios~Galanis, Gerasimos~Lampouras and Ion~Androutsopoulos.
 \newblock 2012.
 \newblock {\em Extractive Multi-Document Summarization with Integer Linear Programming and Support Vector Regression.}
-\newblock{Proceedings of COLING 2012, 2012: 911-926.}
+\newblock{Proceedings of COLING 2012, 2012: 911-926.}\\
 
 \bibitem[\protect\citename{Gillick and Favre}2009]{Gillick:09}
 Dan~Gillick and Benoit~Favre.
