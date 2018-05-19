@@ -11,7 +11,7 @@ Team member: Haobo Gu, Haotian Zhu, Weifeng Jin, Yuanhe Tian
 To run the system on devtest folder, just use the command below:
 
 ```
-condor_submit src/run.cmd
+condor_submit src/D3.cmd
 ```
 
 This command must be used at the root directory of the project.
@@ -20,7 +20,7 @@ The command will create a virtual environment and install all packages which are
 
 If you have all needed packages installed, every run will take about 2 hours. 
 
-If you want to change input folder, please modify `src/run.cmd`.
+If you want to change input folder, please modify `src/D3.cmd`.
 
 ### Note
 
