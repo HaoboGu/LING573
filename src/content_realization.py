@@ -343,12 +343,14 @@ class ContentRealization:
         :return: list[sentence]
         """
         candidate = [sent]
+        exist_sent = [sent.content()]
         for prune_type in self.prune_pipe:
             sent_content = sent.content()
             pruned_sent = self._prune_sentence(sent_content, prune_type)
-            new_length = self._get_length(pruned_sent)
-            candidate.append(dp.sentence(sent.idCode(), pruned_sent, sent.index(), sent.score(),
-                                         new_length, sent.tokenDict(), sent.doctime()))
+            if pruned_sent not in exist_sent and pruned_sent != '':
+                new_length = self._get_length(pruned_sent)
+                candidate.append(dp.sentence(sent.idCode(), pruned_sent, sent.index(), sent.score(),
+                                             new_length, sent.tokenDict(), sent.doctime()))
         return candidate
 
     def _compression_ilp(self, scu, topic_id):
@@ -359,9 +361,107 @@ class ContentRealization:
         """
         # Get pruned sentences
         all_candidates = []
+        group_lengths = []
         for item in scu:
-            all_candidates += self._generate_compressed_candidate(item)
-        self._improved_ilp(all_candidates, topic_id)
+            candidates = self._generate_compressed_candidate(item)
+            all_candidates += candidates
+            group_lengths.append(len(candidates))
+        bigram_dict, bigram_set = get_bigrams(all_candidates)
+        n_bigram = len(bigram_set)
+        n_sent = len(all_candidates)
+
+        # Calculate weights in objective function
+        # Count every bigram's occurrence
+        bigram_freq = {}
+        delta = 0.001
+        for index in bigram_dict:
+            # For bigrams in each sentence[index]
+            for bigram in bigram_dict[index]:
+                # Bigrams in important sentences have higher weights
+                if bigram not in bigram_freq:
+                    bigram_freq[bigram] = 1 + delta * (n_sent - index)
+                else:
+                    bigram_freq[bigram] = bigram_freq[bigram] + 1 + delta * (n_sent - index)
+        bigram_list = list(bigram_set)  # the order of bigram variables
+
+        # Use frequency of bigram as its weight
+        weight = []
+        for i in range(n_bigram):
+            weight.append(bigram_freq[bigram_list[i]])
+        weight_s = np.zeros(n_sent)
+        for i in range(n_sent):
+            # Give a very small weight to every sentence
+            weight_s[i] = delta * (n_sent - i)
+        weight = np.concatenate((np.array(weight), weight_s), axis=0)  # add s_j after c_i
+
+        # Calculate coefs
+        # Variable: c_i, s_j
+        n_constraint = 0
+        coefs_1 = []  # constraint 1, i*j rows
+        coefs_2 = []  # constraint 2, i rows
+        for i in range(n_bigram):
+            coefs_sum_s = np.zeros(n_sent)
+            for j in range(n_sent):
+                coefs_c = np.zeros(n_bigram)
+                coefs_s = np.zeros(n_sent)
+                if bigram_list[i] in bigram_dict[j]:
+                    # c_i in s_j, s_j - c_i <= 0
+                    coefs_c[i] = -1
+                    coefs_s[j] = 1
+                    coefs_sum_s[j] = -1
+                    coefs_1.append(np.concatenate((coefs_c, coefs_s), axis=0))
+                    n_constraint += 1
+            coefs_sum_c = np.zeros(n_bigram)
+            coefs_sum_c[i] = 1
+            coefs_2.append(np.concatenate((coefs_sum_c, coefs_sum_s), axis=0))
+            n_constraint += 1
+
+        coefs_3_s = np.zeros(n_sent)  # constraint 3, length constraint, 1 row
+        for i in range(n_sent):
+            coefs_3_s[i] = all_candidates[i].length()
+
+        # Constraint for each group of compression candidate
+        coefs_4 = []
+        cur_pos = 0  # current position
+        for n_group in group_lengths:
+            coefs_4_s = np.zeros(n_sent)
+            coefs_4_c = np.zeros(n_bigram)
+            coefs_4_s[cur_pos:cur_pos+n_group] = 1
+            coefs_4.append(np.concatenate((coefs_4_c, coefs_4_s), axis=0))
+            cur_pos = cur_pos + n_group
+
+        # Use pulp to solve ILP problem
+        ilp_model = pulp.LpProblem('content realization', pulp.LpMaximize)
+        # Define variables
+        sentences = pulp.LpVariable.dict("sentence", (i for i in range(n_sent)),
+                                         lowBound=0, upBound=1, cat=pulp.LpInteger)
+        concepts = pulp.LpVariable.dict("concept", (i for i in range(n_bigram)),
+                                        lowBound=0, upBound=1, cat=pulp.LpInteger)
+        # Add objective function
+        ilp_model += pulp.lpSum([weight[int(key)] * concepts[key] for key in concepts]), "Objective function"
+        # Add length constraint
+        ilp_model += pulp.lpSum([coefs_3_s[int(key)] * sentences[key] for key in sentences]) <= self.max_length
+        # Add constraints 1
+        for coefs in coefs_1:
+            ilp_model += pulp.lpSum([coefs[key] * concepts[key] for key in concepts] +
+                                    [coefs[key2 + n_bigram] * sentences[key2] for key2 in sentences]) <= 0
+        # Add constraints 2
+        for coefs in coefs_2:
+            ilp_model += pulp.lpSum([coefs[key] * concepts[key] for key in concepts] +
+                                    [coefs[key2 + n_bigram] * sentences[key2] for key2 in sentences]) <= 0
+
+        # Add constraints 4
+        for coefs in coefs_4:
+            ilp_model += pulp.lpSum([coefs[key] * concepts[key] for key in concepts] +
+                                    [coefs[key2 + n_bigram] * sentences[key2] for key2 in sentences]) <= 1
+
+        # ilp_model.writeLP('ilp_model')  # write ilp model to file
+        ilp_model.solve(pulp.PULP_CBC_CMD())
+        indices = np.array([sentences[key].value() for key in sentences])
+        indices[indices == None] = 0
+        summary = [sent.content() for sent in np.array(all_candidates)[indices > 0.1]]
+        # Write result
+        write(summary, topic_id, output_folder_name=self.output_folder_name, over_write=True)
 
     def _get_length(self, sent):
         """
