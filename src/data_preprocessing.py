@@ -4,6 +4,7 @@ import os
 import re
 import nltk
 import string
+import spacy
 
 class corpus:
     def __init__(self, docsetList, tokenDict):
@@ -171,10 +172,15 @@ def update_dictionary(docset_dict, doc_dict):
         else:
             docset_dict[word] = doc_dict[word] # set the count
 
-def update_the_doc(doc, sentence_text, idx, doc_id, doc_time):
+def update_the_doc(doc, sentence_text, idx, doc_id, doc_time, nlp):
     index = idx
     sentence_text = sentence_text.replace('\n', ' ')
-    sentences = nltk.tokenize.sent_tokenize(sentence_text) # sent_tokenize the whole text
+    sentence_text = re.sub('\s+', ' ', sentence_text)
+    sentence_text = sentence_text.replace('``', '"')
+    sentence_text = sentence_text.replace("''", '"')
+    # sentences = nltk.tokenize.sent_tokenize(sentence_text)  # sent_tokenize the whole text
+    sentences_list = nlp(sentence_text)  # Use spacy as sentence tokenizer
+    sentences = [sent.text for sent in sentences_list.sents]
     for sent in sentences:
         word_tokens = nltk.tokenize.word_tokenize(sent)
         new_sent = sentence(doc_id, sent.strip(), index, 0, len(word_tokens), {}, doc_time)
@@ -197,6 +203,8 @@ def update_the_doc(doc, sentence_text, idx, doc_id, doc_time):
 
 def fill_in_corpus_data(fullCorpus, dir1, dir2):
     # This function fill in the information of the corpus
+    nlp = spacy.load('en', disable=["tagger", "parser", "ner"])
+    nlp.add_pipe(nlp.create_pipe('sentencizer'))
     for docSet in fullCorpus._docsetList: # iterate through all document sets
         for doc in docSet._documentCluster: # iterate through all documents
             doc_id = doc._idCode
@@ -217,12 +225,12 @@ def fill_in_corpus_data(fullCorpus, dir1, dir2):
                             continue
                         para_all = text_all.find('P')
                         if para_all == None: # some documents does not have <p> tag, in that case, content is in <text>
-                            update_the_doc(doc, text_all.text.strip(), 0, doc_id, doc_time)
+                            update_the_doc(doc, text_all.text.strip(), 0, doc_id, doc_time, nlp)
                             break
                         else:
                             index = 0
                             for para in text_all.iter(tag='P'): # documents having <p> tag
-                                update_idx = update_the_doc(doc, para.text.strip(), index, doc_id, doc_time)
+                                update_idx = update_the_doc(doc, para.text.strip(), index, doc_id, doc_time, nlp)
                                 index += update_idx
                             break
                 os.remove(doc_path) # remove the file to release the space
@@ -239,12 +247,12 @@ def fill_in_corpus_data(fullCorpus, dir1, dir2):
                             continue
                         para_all = text_all.find('P')
                         if para_all == None: # some documents does not have <p> tag, in that case, content is in <text>
-                            update_the_doc(doc, text_all.text.strip(), 0, doc_id, doc_time)
+                            update_the_doc(doc, text_all.text.strip(), 0, doc_id, doc_time, nlp)
                             break
                         else:
                             index = 0
                             for para in text_all.iter(tag='P'): # documents having <p> tag
-                                update_idx = update_the_doc(doc, para.text.strip(), index, doc_id, doc_time)
+                                update_idx = update_the_doc(doc, para.text.strip(), index, doc_id, doc_time, nlp)
                                 index += update_idx
                             break
             update_dictionary(docSet._tokenDict, doc._tokenDict) # update the dictionary for the document set
