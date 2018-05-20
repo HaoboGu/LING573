@@ -33,15 +33,15 @@ if __name__ == "__main__":
     type3 = "Combined"
     training_corpus = dp.generate_corpus(training_corpus_file, aqua, aqua2, human_judge)
     docset_list = training_corpus.docsetList()
-    cs_model = cs.train_model(training_corpus, type3)
+    cs_model = cs.train_model(training_corpus, type2)
     for docset in docset_list:
         print("Processing docset", docset.idCode())
         important_sentences = cs.cs(docset, comp_rate, cs_model)
         chro_exp = io.calc_chro_exp(important_sentences)
         sent_list = io.sent_ordering(important_sentences, chro_exp)
-        content_realization = cr.ContentRealization(solver="improved_ilp", lambda1=0.5, lambda2=0.5,
+        content_realization = cr.ContentRealization(solver="compression_ilp", lambda1=0.5, lambda2=0.5,
                                                     output_folder_name='D3',
-                                                    prune_pipe=[])
+                                                    prune_pipe=['apposition', 'advcl', 'parenthesis'])
         content_realization.cr(sent_list, docset.idCode())
 
     print("Complete!")

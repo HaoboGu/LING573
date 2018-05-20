@@ -14,6 +14,7 @@ import pulp
 import spacy
 import re
 import string
+import src.data_preprocessing as dp
 
 
 class ContentRealization:
@@ -35,6 +36,7 @@ class ContentRealization:
         self.nlp = spacy.load('en')
         self.output_folder_name = output_folder_name
         self.prune_pipe = prune_pipe
+        self.puncts = string.punctuation
 
     def cr(self, scu, topic_id):
         """
@@ -48,8 +50,8 @@ class ContentRealization:
             self._linear_prog(scu, topic_id)
         elif self.solver == 'improved_ilp':
             self._improved_ilp(scu, topic_id)
-        # elif self.solver == 'parse_tree':
-        #     self._parse_tree(scu, topic_id)
+        elif self.solver == 'compression_ilp':
+            self._compression_ilp(scu, topic_id)
 
     def prune_pipeline(self, scu, prune_pipe):
         """
@@ -57,13 +59,11 @@ class ContentRealization:
         :param scu: list of sentence
         :param prune_pipe: the order of pruning methods
         """
-        print('Start pruning ...')
         for prune_type in prune_pipe:
-            scu = self._prune(scu, prune_type)
-        print('Finish pruning ...')
+            scu = self._prune_all(scu, prune_type)
         return scu
 
-    def _prune(self, scu, prune_type):
+    def _prune_all(self, scu, prune_type):
         """
         Prune sentences by removing unnecessary constituents. Modify scu in place.
         :param scu: list of sentence
@@ -71,70 +71,70 @@ class ContentRealization:
         """
         for index, item in enumerate(scu):
             sent = item.content()
-            if prune_type == 'parenthesis':
-                sent = re.sub(self.parenthesis_re, '', sent).strip(' ')  # remove all contents in a pair of parenthesis
-                sent = re.sub(self.space_re, ' ', sent).strip(' ')
-            elif prune_type == 'advcl':
-                tokens = self.nlp(sent)
-                if len(tokens) == 0:
-                    continue
-                if tokens[0].dep_ == 'advcl' or tokens[0].dep_ == 'prep':
-                    # If sentence starts with a short adv clause, remove this clause
-                    # Or if sentence starts with a short preposition phrase, remove it as well
-                    if ',' in sent[0:100]:
-                        # print('remove:', sent[:sent.find(',')])
-                        # print('original sentence:', sent)
-                        sent = sent[sent.find(',')+1:].strip().capitalize()
-            elif prune_type == 'apposition':
-                tokens = self.nlp(sent)
-                if len(tokens) == 0:
-                    continue
-                # Remove apposition
-                for token in tokens:
-                    if token.dep_ == 'appos':
-                        same_layer = [x for x in token.head.children]
-                        pos_in_layer = same_layer.index(token)
-                        if pos_in_layer - 1 >= 0 and pos_in_layer + 1 < len(same_layer) and \
-                                same_layer[pos_in_layer-1].dep_ == 'punct' and same_layer[pos_in_layer+1].dep_ == 'punct':
-                            appo_start = same_layer[pos_in_layer-1].i
-                            appo_end = same_layer[pos_in_layer+1].i
-                            print('\"', tokens[appo_start:appo_end], '\" is removed')
-                            print('       sent:', sent)
-                            sent = tokens[:appo_start].text + tokens[appo_end:].text
-                            print('pruned sent:', sent, '\n ------')
-                            break  # prune only one apposition for each sentence
-                        else:
-                            # Get the subtree of apposition
-                            subtree = [x for x in token.subtree]
-                            if subtree[0].dep_ == 'punct':
-                                appo_start = subtree[0].i
-                            else:
-                                appo_start = subtree[0].i - 1
-                            if subtree[-1].dep_ == 'punct':
-                                appo_end = subtree[-1].i
-                            elif subtree[-1].i + 1 < len(tokens):
-                                appo_end = subtree[-1].i + 1
-                            else:
-                                appo_end = subtree[-1].i
-                            # If the apposition is surrounded by puncs, remove it
-                            if tokens[appo_end].dep_ == 'punct' and tokens[appo_start].dep_ == 'punct':
-                                print(subtree, 'is removed')
-                                print('       sent:', sent)
-                                sent = tokens[:appo_start].text + tokens[appo_end:].text
-                                print('pruned sent:', sent, '\n ------')
-                                break  # prune only one apposition for each sentence
-
+            sent = self._prune_sentence(sent, prune_type)
+            print('pruned sentence:', sent)
             # Re-calculate sentence length
-            n_puncs = 0
-            word_seq = nltk.word_tokenize(sent)
-            for word in word_seq:
-                if word in string.punctuation:
-                    n_puncs += 1
+            new_length = self._get_length(sent)
             # Update scu
             scu[index].set_content(sent)
-            scu[index].set_length(len(word_seq)-n_puncs)
+            scu[index].set_length(new_length)
 
         return scu
+
+    def _prune_sentence(self, sent, prune_type):
+        """
+        Apply prune compression methods on sentence and return pruned string
+        :param sent: str
+        :param prune_type: str
+        :return: str
+        """
+        if prune_type == 'parenthesis':
+            # Remove all contents in parenthesis
+            sent = re.sub(self.parenthesis_re, '', sent).strip(' ')
+            sent = re.sub(self.space_re, ' ', sent).strip(' ')
+        elif prune_type == 'advcl':
+            tokens = self.nlp(sent)
+            if len(tokens) == 0:
+                return ''
+            if tokens[0].dep_ == 'advcl' or tokens[0].dep_ == 'prep':
+                # If sentence starts with a short adv clause, remove this clause
+                # Or if sentence starts with a short preposition phrase, remove it as well
+                if ',' in sent[0:100]:
+                    sent = sent[sent.find(',') + 1:].strip().capitalize()
+        elif prune_type == 'apposition':
+            tokens = self.nlp(sent)
+            if len(tokens) == 0:
+                return ''
+            # Remove apposition
+            for token in tokens:
+                if token.dep_ == 'appos':
+                    same_layer = [x for x in token.head.children]  # all elements in current layer
+                    pos_in_layer = same_layer.index(token)  # index of apposition in current layer
+                    if pos_in_layer - 1 >= 0 and pos_in_layer + 1 < len(same_layer) and \
+                            same_layer[pos_in_layer - 1].dep_ == 'punct' and \
+                            same_layer[pos_in_layer + 1].dep_ == 'punct':
+                        appo_start = same_layer[pos_in_layer - 1].i
+                        appo_end = same_layer[pos_in_layer + 1].i
+                        sent = tokens[:appo_start].text + tokens[appo_end:].text
+                        break  # prune only one apposition for each sentence
+                    else:
+                        # Get the subtree of apposition
+                        subtree = [x for x in token.subtree]
+                        if subtree[0].dep_ == 'punct':
+                            appo_start = subtree[0].i
+                        else:
+                            appo_start = subtree[0].i - 1
+                        if subtree[-1].dep_ == 'punct':
+                            appo_end = subtree[-1].i
+                        elif subtree[-1].i + 1 < len(tokens):
+                            appo_end = subtree[-1].i + 1
+                        else:
+                            appo_end = subtree[-1].i
+                        # If the apposition is surrounded by puncs, remove it
+                        if tokens[appo_end].dep_ == 'punct' and tokens[appo_start].dep_ == 'punct':
+                            sent = tokens[:appo_start].text + tokens[appo_end:].text
+                            break  # prune only one apposition for each sentence
+        return sent
 
     def _get_summarizations(self, scu):
         """
@@ -254,7 +254,7 @@ class ContentRealization:
         :param scu: list[Sentence]
         :param topic_id: topic id for this docset
         """
-        scu = self.prune_pipeline(scu, self.prune_pipe)
+        # scu = self.prune_pipeline(scu, self.prune_pipe)
         bigram_dict, bigram_set = get_bigrams(scu)
         n_bigram = len(bigram_set)
         n_sent = len(scu)
@@ -270,7 +270,7 @@ class ContentRealization:
                 if bigram not in bigram_freq:
                     bigram_freq[bigram] = 1 + delta * (n_sent - index)
                 else:
-                    bigram_freq[bigram] = bigram_freq[bigram]  + 1 + delta * (n_sent - index)
+                    bigram_freq[bigram] = bigram_freq[bigram] + 1 + delta * (n_sent - index)
         bigram_list = list(bigram_set)  # the order of bigram variables
         # Use frequency of bigram as its weight
         weight = []
@@ -336,6 +336,47 @@ class ContentRealization:
         # Write result
         write(summary, topic_id, output_folder_name=self.output_folder_name, over_write=True)
 
+    def _generate_compressed_candidate(self, sent):
+        """
+        Generate compressed sentence candidates, including original sentence
+        :param sent: sentence object
+        :return: list[sentence]
+        """
+        candidate = [sent]
+        for prune_type in self.prune_pipe:
+            sent_content = sent.content()
+            pruned_sent = self._prune_sentence(sent_content, prune_type)
+            new_length = self._get_length(pruned_sent)
+            candidate.append(dp.sentence(sent.idCode(), pruned_sent, sent.index(), sent.score(),
+                                         new_length, sent.tokenDict(), sent.doctime()))
+        return candidate
+
+    def _compression_ilp(self, scu, topic_id):
+        """
+        Content realization by combining ILP and sentence compression
+        :param scu: list[sentence]
+        :param topic_id: str
+        """
+        # Get pruned sentences
+        all_candidates = []
+        for item in scu:
+            all_candidates += self._generate_compressed_candidate(item)
+        self._improved_ilp(all_candidates, topic_id)
+
+    def _get_length(self, sent):
+        """
+        Get sentence length, without counting punctuations
+        :param sent: str
+        :return: int
+        """
+        n_puncs = 0
+        word_seq = nltk.word_tokenize(sent)
+        for word in word_seq:
+            if word in self.puncts:
+                n_puncs += 1
+        new_length = len(word_seq) - n_puncs
+        return new_length
+
 
 # Helper functions
 def get_lengths(scu):
@@ -367,6 +408,7 @@ def get_bigrams(scu):
         bigram_dict[index] = bigrams  # key is the order of the sentence
         bigram_set = bigram_set.union(set(bigrams))
     return bigram_dict, bigram_set
+
 
 
 # Test script
