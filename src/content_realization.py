@@ -8,6 +8,7 @@
 """
 
 from src.writer import write
+from nltk.corpus import stopwords
 import nltk
 import numpy as np
 import pulp
@@ -36,7 +37,8 @@ class ContentRealization:
         self.nlp = spacy.load('en')
         self.output_folder_name = output_folder_name
         self.prune_pipe = prune_pipe
-        self.puncts = string.punctuation
+        self.puncts = set(string.punctuation)
+        self.stopwords_set = set(stopwords.words('english')).union(self.puncts)
 
     def cr(self, scu, topic_id):
         """
@@ -144,13 +146,12 @@ class ContentRealization:
         """
         total_length = 0
         summary = []
-        sent_lens = get_lengths(scu)
         # Add sentences to summary
         for index, item in enumerate(scu):
             # Total length of summary should not larger than 100
-            if total_length + sent_lens[index] <= self.max_length:
+            if total_length + item.length() <= self.max_length:
                 summary.append(item.content())
-                total_length += sent_lens[index]
+                total_length += item.length()
         return summary
 
     def _simple_cr(self, scu, topic_id):
@@ -169,21 +170,20 @@ class ContentRealization:
         :param scu: a list of sentence
         :param topic_id: topic id for this docset
         """
-        bigram_dict, bigram_set = get_bigrams(scu)
+        bigram_dict, bigram_set, bigram_freq = self._get_bigrams(scu)
         n_sentence = len(scu)  # number of sentences
         n_bigram = len(bigram_set)  # number of different bigrams
         bigram_list = list(bigram_set)
 
         # Get lengths for all sentences
-        sent_lens = get_lengths(scu)
-        min_sent_len = min(sent_lens)  # get number of words in shortest sentence
+        min_sent_len = 8  # get number of words in shortest sentence
 
         # Calculate coefficients in target function
         # All coefs are divided to two parts: importance(imp) and diversity(div)
         target_imp_coef = np.zeros(n_sentence)
         target_div_coef = np.zeros(n_bigram)
         for i in range(n_sentence):
-            target_imp_coef[i] = self.lambda1 * scu[i].score() * sent_lens[i] / (self.max_length / min_sent_len)
+            target_imp_coef[i] = self.lambda1 * scu[i].score() * scu[i].length() / (self.max_length / min_sent_len)
         for i in range(n_bigram):
             target_div_coef[i] = self.lambda2 / n_sentence
         # target_coef = np.concatenate((target_imp_coef, target_div_coef), axis=0)
@@ -255,7 +255,7 @@ class ContentRealization:
         :param topic_id: topic id for this docset
         """
         # scu = self.prune_pipeline(scu, self.prune_pipe)
-        bigram_dict, bigram_set = get_bigrams(scu)
+        bigram_dict, bigram_set, bigram_freq = self._get_bigrams(scu)
         n_bigram = len(bigram_set)
         n_sent = len(scu)
 
@@ -348,6 +348,7 @@ class ContentRealization:
             sent_content = sent.content()
             pruned_sent = self._prune_sentence(sent_content, prune_type)
             if pruned_sent not in exist_sent and pruned_sent != '':
+                # Only add different sentences to the set
                 new_length = self._get_length(pruned_sent)
                 candidate.append(dp.sentence(sent.idCode(), pruned_sent, sent.index(), sent.score(),
                                              new_length, sent.tokenDict(), sent.doctime()))
@@ -366,36 +367,27 @@ class ContentRealization:
             candidates = self._generate_compressed_candidate(item)
             all_candidates += candidates
             group_lengths.append(len(candidates))
-        bigram_dict, bigram_set = get_bigrams(all_candidates)
+        bigram_dict, bigram_set, bigram_freq = self._get_bigrams(all_candidates)
         n_bigram = len(bigram_set)
         n_sent = len(all_candidates)
-
-        # Calculate weights in objective function
-        # Count every bigram's occurrence
-        bigram_freq = {}
-        delta = 0.001
-        for index in bigram_dict:
-            # For bigrams in each sentence[index]
-            for bigram in bigram_dict[index]:
-                # Bigrams in important sentences have higher weights
-                if bigram not in bigram_freq:
-                    bigram_freq[bigram] = 1 + delta * (n_sent - index)
-                else:
-                    bigram_freq[bigram] = bigram_freq[bigram] + 1 + delta * (n_sent - index)
         bigram_list = list(bigram_set)  # the order of bigram variables
 
-        # Use frequency of bigram as its weight
+        # Calculate weights in objective function
+        # Use number of occurrences of bigram as its weight
         weight = []
         for i in range(n_bigram):
             weight.append(bigram_freq[bigram_list[i]])
+        # Give a very small weight to every sentence to reduce randomness
         weight_s = np.zeros(n_sent)
+        delta = 0.005
         for i in range(n_sent):
-            # Give a very small weight to every sentence
             weight_s[i] = delta * (n_sent - i)
         weight = np.concatenate((np.array(weight), weight_s), axis=0)  # add s_j after c_i
 
         # Calculate coefs
         # Variable: c_i, s_j
+
+        # First, calculate coefs for constraints 1 and 2.
         n_constraint = 0
         coefs_1 = []  # constraint 1, i*j rows
         coefs_2 = []  # constraint 2, i rows
@@ -416,11 +408,12 @@ class ContentRealization:
             coefs_2.append(np.concatenate((coefs_sum_c, coefs_sum_s), axis=0))
             n_constraint += 1
 
-        coefs_3_s = np.zeros(n_sent)  # constraint 3, length constraint, 1 row
+        # Constraint 3, length constraint, 1 row
+        coefs_3_s = np.zeros(n_sent)
         for i in range(n_sent):
             coefs_3_s[i] = all_candidates[i].length()
 
-        # Constraint for each group of compression candidate
+        # Constraint for each group of compressed candidates
         coefs_4 = []
         cur_pos = 0  # current position
         for n_group in group_lengths:
@@ -477,68 +470,71 @@ class ContentRealization:
         new_length = len(word_seq) - n_puncs
         return new_length
 
-
-# Helper functions
-def get_lengths(scu):
-    """
-    Get lengths for all sentences
-    :param scu: list of sentence
-    :return: list of lengths
-    """
-    sent_lens = []  # list of lengths for sentences
-    for sent in scu:
-        sent_lens.append(len(nltk.word_tokenize(sent.content())))
-    return sent_lens
-
-
-def get_bigrams(scu):
-    """
-    Get all bigrams from a list of sorted scu
-    :param scu: a list of sentences
-    :return bigram_dict: each sentence's bigrams, key is the sentence's index
-    :return bigram_set: a set of all bigrams
-    """
-    bigram_dict = {}
-    bigram_set = set()
-    for index, sent in enumerate(scu):
-        bigrams = []
-        word_seq = nltk.word_tokenize(sent.content())
-        for word_index in range(0, len(word_seq)-1):  # for all bigrams
-            bigrams.append((word_seq[word_index], word_seq[word_index+1]))
-        bigram_dict[index] = bigrams  # key is the order of the sentence
-        bigram_set = bigram_set.union(set(bigrams))
-    return bigram_dict, bigram_set
-
+    def _get_bigrams(self, scu):
+        """
+        Get all bigrams from a list of sorted scu
+        :param scu: a list of sentences
+        :return bigram_dict: each sentence's bigrams, key is the sentence's index
+        :return bigram_set: a set of all bigrams
+        :return bigram_freq: number of bigram occurrences in different sentences
+        """
+        bigram_dict = {}
+        bigram_set = set()
+        bigram_freq = {}
+        for index, sent in enumerate(scu):
+            bigrams = []
+            word_seq = nltk.word_tokenize(sent.content())
+            for word_index in range(0, len(word_seq)-1):  # for all bigrams
+                if (word_seq[word_index] in self.stopwords_set) and (word_seq[word_index+1] in self.stopwords_set):
+                    print('stopwords: ', word_seq[word_index], word_seq[word_index+1])
+                else:
+                    # Exclude bigrams consist of stopwords
+                    bigrams.append((word_seq[word_index], word_seq[word_index + 1]))
+                    # Count bigram's frequency
+                    if (word_seq[word_index], word_seq[word_index + 1]) not in bigram_freq:
+                        bigram_freq[(word_seq[word_index], word_seq[word_index + 1])] = {sent.idCode()}
+                    else:
+                        bigram_freq[(word_seq[word_index], word_seq[word_index + 1])].add(sent.idCode())
+            bigram_dict[index] = bigrams  # key is the order of the sentence
+            bigram_set = bigram_set.union(set(bigrams))
+        for key in bigram_freq:
+            bigram_freq[key] = len(bigram_freq[key])
+        return bigram_dict, bigram_set, bigram_freq
 
 
 # Test script
 if __name__ == "__main__":
-    import src.data_preprocessing as dp
     import src.content_selection as cs
     import src.information_ordering as io
-    print('Start...')
 
     # Paths and variables
-    data_home = "."
-    training_corpus_file = data_home + "/Data/Documents/training/2009/UpdateSumm09_test_topics.xml"
-    demo_training_corpus_file = data_home + "/Data/UpdateSumm09_demo_test_topics18.xml"
+
+    data_home = ".."
+    # training_corpus_file = data_home + "/Data/Documents/training/2009/UpdateSumm09_test_topics.xml"
+    training_corpus_file = data_home + "/Data/UpdateSumm09_demo_test_topics18.xml"
+    # training_corpus_file = data_home + "/Data/Documents/devtest/GuidedSumm10_test_topics.xml"
     aqua = data_home + "/AQUAINT"
     aqua2 = data_home + "/AQUAINT-2/data"
     human_judge = data_home + "/Data/models/training/2009"
+    print('Start...')
+
     comp_rate = 0.1  # The number of sentence selected
     converge_standard = 0.001  # Used to judge if the score is converging
 
     print("Reading Corpus...")
-    training_corpus = dp.generate_corpus(demo_training_corpus_file, aqua, aqua2, human_judge)
+    type2 = "KL_Divergence"
+    type3 = "Combined"
+    training_corpus = dp.generate_corpus(training_corpus_file, aqua, aqua2, human_judge)
     docset_list = training_corpus.docsetList()
-    docset_dic = {}
-    for docset in docset_list:  # traverse through all document sets
+    cs_model = cs.train_model(training_corpus, type3)
+    content_realization = ContentRealization(solver="compression_ilp", lambda1=0.5, lambda2=0.5,
+                                                output_folder_name='D3',
+                                                prune_pipe=['apposition', 'advcl', 'parenthesis'])
+    for docset in docset_list:
         print("Processing docset", docset.idCode())
-        important_sentences = cs.cs(docset, compression_rate=comp_rate)  # content selection
-        sent_list = io.sort_sentence_list(important_sentences)  # sort important sentences
-        content_realization = ContentRealization(solver="improved_ilp")  # use improved ILP solver in cr
+        important_sentences = cs.cs(docset, comp_rate, cs_model)
+        chro_exp = io.calc_chro_exp(important_sentences)
+        sent_list = io.sent_ordering(important_sentences, chro_exp)
         content_realization.cr(sent_list, docset.idCode())
 
-
-
-
+    print("Complete!")
