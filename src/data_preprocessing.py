@@ -4,6 +4,7 @@ import os
 import re
 import nltk
 import string
+import gzip
 
 class corpus:
     def __init__(self, docsetList, tokenDict):
@@ -75,12 +76,6 @@ class sentence:
         self._length = length
         self._tokenDict = tokenDict
         self._doctime = doctime
-
-    def set_content(self, content):
-        self._content = content
-
-    def set_length(self, length):
-        self._length = length
 
     def idCode(self):
         return self._idCode
@@ -251,6 +246,60 @@ def fill_in_corpus_data(fullCorpus, dir1, dir2):
         update_dictionary(fullCorpus._tokenDict, docSet._tokenDict) # update the dictionary for the corpus
     return fullCorpus
 
+def fill_in_corpus_data_test(fullCorpus, dir):
+    # This function fill in the information of the corpus
+    for docSet in fullCorpus._docsetList: # iterate through all document sets
+        for doc in docSet._documentCluster: # iterate through all documents
+            doc_id = doc._idCode
+            doc_path, flag = generate_a_path("", dir, doc_id)
+            doc_path = doc_path.replace('.xml', '.gz')
+                
+            g = gzip.GzipFile(mode="rb", fileobj=open(doc_path, 'rb'))
+            xml_file = open('try.xml', 'wb')
+            xml_file.write(b'<DOCSTREAM>\n')
+            xml_file.write(g.read())
+            xml_file.write(b'</DOCSTREAM>')
+            g.close()
+            doc_time = doc._time
+            xml_file.close()
+            if doc_id == "XIN_ENG_20081118.0115":
+                with open('try.xml', 'rt') as f:
+                    with open('try_new.xml', 'wt') as modified: # create a new file for reading
+                        for line in f:
+                            modified.write(re.sub(r"<3", "", line)) # replace special tokens with space
+                tree = ET.ElementTree(file='try_new.xml') # read the xml file as an elemen tree
+            else:
+                try:
+                    tree = ET.ElementTree(file='try.xml') # read the xml file as an elemen tree
+                except:
+                    print(doc_id)
+                    sys.exit(0)
+
+            if flag == True:
+                for sub_doc in tree.iter(tag='DOC'): # iterate through all sub-document in the doc
+                    docno = sub_doc.attrib["id"]
+                    if docno == None:
+                        continue
+                    if (docno != doc_id.strip()):
+                        continue
+                    else:
+                        text_all = sub_doc.find('TEXT')
+                        if text_all == None:
+                            continue
+                        para_all = text_all.find('P')
+                        if para_all == None: # some documents does not have <p> tag, in that case, content is in <text>
+                            update_the_doc(doc, text_all.text.strip(), 0, doc_id, doc_time)
+                            break
+                        else:
+                            index = 0
+                            for para in text_all.iter(tag='P'): # documents having <p> tag
+                                update_idx = update_the_doc(doc, para.text.strip(), index, doc_id, doc_time)
+                                index += update_idx
+                            break
+            update_dictionary(docSet._tokenDict, doc._tokenDict) # update the dictionary for the document set
+        update_dictionary(fullCorpus._tokenDict, docSet._tokenDict) # update the dictionary for the corpus
+    return fullCorpus
+
 def read_human_judgements(fullCorpus, dir):
     # This function fills human judgements to the corpus
     for docSet in fullCorpus._docsetList:
@@ -271,9 +320,23 @@ def generate_corpus(corpus_file, aqua, aqua2, human_judge):
     fullCorpus = fill_in_corpus_data(fullCorpus, aqua, aqua2) # fill in the data from two datasets
     return fullCorpus
 
+def generate_test_corpus(corpus_file, test_data, human_judge):
+    # generate the corpus
+    fullCorpus = generate_corpus_from_xml(corpus_file) # fill in all the essential information, create the corpus
+    fullCorpus = read_human_judgements(fullCorpus, human_judge) # fill in the human judgements
+    fullCorpus = fill_in_corpus_data_test(fullCorpus, test_data) # fill in the data from two datasets
+    return fullCorpus
+
 if __name__ == "__main__":
+    """
     training_corpus_file = sys.argv[1]
     aqua = sys.argv[2]
     aqua2 = sys.argv[3]
     human_judge = sys.argv[4]
-    fullCorpus = generate_corpus(training_corpus_file, aqua, aqua2, human_judge)
+    ifeval = sys.argv[5]
+    """
+    #fullCorpus = generate_corpus(training_corpus_file, aqua, aqua2, human_judge, ifeval)
+    fullCorpus = generate_test_corpus("dropbox/17-18/573/Data/Documents/evaltest/GuidedSumm11_test_topics.xml","dropbox/17-18/573/ENG-GW/data","dropbox/17-18/573/Data/models/evaltest")
+    #fullCorpus = generate_test_corpus("evaltest.xml","eval","Data/models/evaltest")
+    print(fullCorpus._docsetList[0]._documentCluster[0]._sentences[0]._content)
+    print(len(fullCorpus._docsetList))
