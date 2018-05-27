@@ -4,6 +4,7 @@ import math
 import numpy as np
 import scipy as sp
 import operator as op
+import src.compression as comp
 
 data_home = "/Users/user/Documents/GitHub/573data/573"
 training_corpus_file = data_home + "/Data/Documents/training/2009/UpdateSumm09_test_topics.xml"
@@ -38,7 +39,7 @@ class model:
 # This function gives the content selection result of a given docset.
 # list[data_preprocessing.sentence] cs(list[data_preprocessing.docSet, float)
 def cs(docset, compression_rate, model_type):
-    allsentencelist = generate_sentencelist(docset)
+    allsentencelist = generate_sentencelist(docset, model_type.tagger)
     idf = model_type.idf
     docset_tokenDict = docset.tokenDict()
     model_name = model_type.model_name
@@ -93,12 +94,13 @@ def combine_two_method(score_list1, score_list2):
 
 # This function generates a sentence list of all sentences in a given docset.
 # list[data_preprocessing.sentence] generate_sentencelist(data_preprocesing.docSet)
-def generate_sentencelist(docset):
+def generate_sentencelist(docset, tagger):
     docCluster = docset.documentCluster()
     sentencelist = []
     for doc in docCluster:
         sentences = doc.sentences()
         for sentence in sentences:
+            sentence = comp.compress_sent(sentence, tagger)
             if len(sentence.tokenDict()) > 0:
                 sentencelist.append(sentence)
     return sentencelist
