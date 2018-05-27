@@ -23,8 +23,9 @@ SENT_LEN_THRESHOLD = 8
 
 class model:
 
-    def __init__(self, name, word_art=None, word_sum=None, art_mat=None, sum_mat=None):
+    def __init__(self, name, idf, word_art=None, word_sum=None, art_mat=None, sum_mat=None):
         self.model_name = name
+        self.idf = idf
         self.klag = {}
         self.klga = {}
         if word_art is not None and word_sum is not None and art_mat is not None and sum_mat is not None:
@@ -37,10 +38,11 @@ class model:
 # list[data_preprocessing.sentence] cs(list[data_preprocessing.docSet, float)
 def cs(docset, compression_rate, model_type):
     allsentencelist = generate_sentencelist(docset)
+    idf = model_type.idf
     docset_tokenDict = docset.tokenDict()
     model_name = model_type.model_name
     if op.eq(model_name, LEXRANK):
-        sentence_matrix = sentence2matrix(allsentencelist, docset_tokenDict)
+        sentence_matrix = sentence2matrix(allsentencelist, docset_tokenDict, idf)
         sentence_similarity = calculate_sentence_similarity(sentence_matrix)
         important_score_vector = LexRank(sentence_similarity)
 
@@ -52,7 +54,7 @@ def cs(docset, compression_rate, model_type):
         important_score_vector = get_sentence_score(new_sentence_list)
 
     elif op.eq(model_name, COMBINED):
-        sentence_matrix = sentence2matrix(allsentencelist, docset_tokenDict)
+        sentence_matrix = sentence2matrix(allsentencelist, docset_tokenDict, idf)
         sentence_similarity = calculate_sentence_similarity(sentence_matrix)
         important_score_vector1 = LexRank(sentence_similarity)
         new_sentence_list = replace_sentence_token_dict(allsentencelist, model_type)
@@ -67,7 +69,7 @@ def cs(docset, compression_rate, model_type):
     important_sentences = generate_most_important_sentences(important_score_vector, allsentencelist, output_sen_num)
     return important_sentences
 
-
+'''
 def test_ave_score(docset, model_type):
     allsentencelist = generate_sentencelist(docset)
     docset_tokenDict = docset.tokenDict()
@@ -80,7 +82,7 @@ def test_ave_score(docset, model_type):
     sum2 = sum(important_score_vector2)
     count = len(important_score_vector1)
     return sum1, sum2, count
-
+'''
 
 def combine_two_method(score_list1, score_list2):
     score = []
@@ -118,7 +120,7 @@ def calculate_sentence_similarity(sent_matrix, threshold=0.0):
 
 
 # This function transfers all sentences in a docset into a sentence matrix
-def sentence2matrix(sentences, tokenDict):
+def sentence2matrix(sentences, tokenDict, idf_dict):
     hash2index = {}
     index2hash = list(tokenDict.keys())
     tokenNum = len(index2hash)
@@ -133,7 +135,9 @@ def sentence2matrix(sentences, tokenDict):
             if key not in hash2index:
                 continue
             ind = hash2index[key]
-            sentence_matrix[i][ind] = value
+            tf = float(value) / sent.length()
+            idf = idf_dict[key]
+            sentence_matrix[i][ind] = tf * idf
     return sentence_matrix
 
 
@@ -342,16 +346,36 @@ def get_sentence_score(sentence_list):
     return normalize_score(score_list)
 
 
+def get_idf(corp):
+    df = {}
+    corpus_token_dict = corp.tokenDict().keys()
+    doc_number = 0
+    for token in corpus_token_dict:
+        df[token] = 0
+    for docset in corp.docsetList():
+        for doc in docset.documentCluster():
+            doc_tokens = doc.tokenDict()
+            for tokenid in df.keys():
+                if tokenid in doc_tokens:
+                    df[tokenid] += 1
+                    continue
+            doc_number += 1
+    for tokenid in df.keys():
+        df[tokenid] = math.log(float(doc_number) / df[tokenid])
+    return df
+
+
 def train_model(corpus, model_type):
     docsetlist = corpus.docsetList()
+    idf = get_idf(corpus)
     if op.eq(model_type, LEXRANK):
-        return model(model_type)
+        return model(model_type, idf)
     elif op.eq(model_type, KL_DIVERGENCE):
         word_list_art, word_list_sum, art_matrix, sum_matrix = fc.feature_weight_calc(docsetlist)
-        return model(model_type, word_list_art, word_list_sum, art_matrix, sum_matrix)
+        return model(model_type, idf, word_list_art, word_list_sum, art_matrix, sum_matrix)
     elif op.eq(model_type, COMBINED):
         word_list_art, word_list_sum, art_matrix, sum_matrix = fc.feature_weight_calc(docsetlist)
-        return model(model_type, word_list_art, word_list_sum, art_matrix, sum_matrix)
+        return model(model_type, idf, word_list_art, word_list_sum, art_matrix, sum_matrix)
 
 
 if __name__ == "__main__":
