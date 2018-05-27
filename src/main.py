@@ -38,7 +38,8 @@ if __name__ == "__main__":
         print("Processing docset", docset.idCode())
         important_sentences = cs.cs(docset, comp_rate, cs_model)
         chro_exp = io.calc_chro_exp(important_sentences)
-        sent_list = io.sent_ordering(important_sentences, chro_exp)
+        doc_dic = get_doc_dic(docset)
+        sent_list = io.sent_ordering(important_sentences, chro_exp, doc_dic)
         content_realization = cr.ContentRealization(solver="improved_ilp", lambda1=0.5, lambda2=0.5,
                                                     output_folder_name='D3',
                                                     prune_pipe=[])
