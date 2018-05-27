@@ -23,9 +23,10 @@ SENT_LEN_THRESHOLD = 8
 
 class model:
 
-    def __init__(self, name, idf, word_art=None, word_sum=None, art_mat=None, sum_mat=None):
+    def __init__(self, name, idf, tagger, word_art=None, word_sum=None, art_mat=None, sum_mat=None):
         self.model_name = name
         self.idf = idf
+        self.tagger = tagger
         self.klag = {}
         self.klga = {}
         if word_art is not None and word_sum is not None and art_mat is not None and sum_mat is not None:
@@ -365,17 +366,17 @@ def get_idf(corp):
     return df
 
 
-def train_model(corpus, model_type):
+def train_model(corpus, model_type, tagger):
     docsetlist = corpus.docsetList()
     idf = get_idf(corpus)
     if op.eq(model_type, LEXRANK):
-        return model(model_type, idf)
+        return model(model_type, idf, tagger)
     elif op.eq(model_type, KL_DIVERGENCE):
         word_list_art, word_list_sum, art_matrix, sum_matrix = fc.feature_weight_calc(docsetlist)
-        return model(model_type, idf, word_list_art, word_list_sum, art_matrix, sum_matrix)
+        return model(model_type, idf, tagger, word_list_art, word_list_sum, art_matrix, sum_matrix)
     elif op.eq(model_type, COMBINED):
         word_list_art, word_list_sum, art_matrix, sum_matrix = fc.feature_weight_calc(docsetlist)
-        return model(model_type, idf, word_list_art, word_list_sum, art_matrix, sum_matrix)
+        return model(model_type, idf, tagger, word_list_art, word_list_sum, art_matrix, sum_matrix)
 
 
 if __name__ == "__main__":
