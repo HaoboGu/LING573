@@ -109,7 +109,7 @@ def calc_topic_score(l,Q):
         return(max(max_sim_candidate))
 
 
-def calc_pre_exp(u,v,Q):
+def calc_pre_exp(u,v,Q,doc_dic):
     """
     ========================
     DESCRIPTION: this function calculates precedence expert preference score
@@ -120,8 +120,8 @@ def calc_pre_exp(u,v,Q):
     OUTPUT: precedence expert preference score
     ========================
     """
-    pre_score_u = calc_pre_score(u,v,Q)
-    pre_score_v = calc_pre_score(v,u,Q)
+    pre_score_u = calc_pre_score(u,v,Q,doc_dic)
+    pre_score_v = calc_pre_score(v,u,Q,doc_dic)
     if len(Q) == 0 or pre_score_u == pre_score_v:
         return(0.5)
     elif len(Q) != 0 and pre_score_u > pre_score_v:
@@ -157,7 +157,7 @@ def calc_pre_score(u,v,Q,doc_dic):
         return(sum_score/len(Q)) 
 
 
-def calc_succ_exp(u,v,Q):
+def calc_succ_exp(u,v,Q,doc_dic):
     """
     ========================
     DESCRIPTION: this function calculates succession expert preference score
@@ -168,8 +168,8 @@ def calc_succ_exp(u,v,Q):
     OUTPUT: succession expert preference score
     ========================
     """
-    succ_score_u = calc_succ_score(u,v,Q)
-    succ_score_v = calc_succ_score(v,u,Q)
+    succ_score_u = calc_succ_score(u,v,Q,doc_dic)
+    succ_score_v = calc_succ_score(v,u,Q,doc_dic)
     if len(Q) == 0 or succ_score_u == succ_score_v:
         return(0.5)
     elif len(Q) != 0 and succ_score_u > succ_score_v:
@@ -230,8 +230,6 @@ def sent_ordering(X,chro_exp,doc_dic):
     DESCRIPTION: this function takes an unsorted list of sentences and sort the sentences
     ========================
     INPUT: X: list[sentence]
-           chro_exp: chronological expert
-           doc_dic: document dictionary by id code
     ========================
     OUTPUT: sorted_list: sorted sentence list
     ========================
