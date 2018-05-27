@@ -451,7 +451,7 @@ class ContentRealization:
         # ilp_model.writeLP('ilp_model')  # write ilp model to file
         ilp_model.solve(pulp.PULP_CBC_CMD())
         indices = np.array([sentences[key].value() for key in sentences])
-        indices[indices == None] = 0
+        indices[np.isnan(indices.astype(float))] = 0  # convert None to 0
         summary = [sent.content() for sent in np.array(all_candidates)[indices > 0.1]]
         # Write result
         write(summary, topic_id, output_folder_name=self.output_folder_name, over_write=True)
