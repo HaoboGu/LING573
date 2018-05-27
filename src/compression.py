@@ -2,6 +2,7 @@ import xml.etree.ElementTree as ET
 import os
 import nltk
 import pycrfsuite
+from src.data_preprocessing import sentence
 
 stopwords = nltk.corpus.stopwords.words('english')
 negation = set(['not', 'no', "n't", "nt"])
@@ -136,13 +137,25 @@ def get_compressed(X, Y):
             addr += (X[idx][1].split("=")[1]+" ")
     return addr.strip()
 
-def compress_sent(sentence, tagger):
-    sent_tokens = nltk.word_tokenize(sentence)
+def create_dictionary(sentence_tokens):
+    sent_dict = dict()
+    for tok in sentence_tokens:
+        if hash(tok) in sent_dict:
+            sent_dict[hash(tok)] += 1
+        else:
+            sent_dict[hash(tok)] = 1
+    return sent_dict
+
+def compress_sent(inputsent, tagger):
+    sent_tokens = nltk.word_tokenize(inputsent._content)
     tags = nltk.pos_tag(sent_tokens)
 
     input_feat = extract_features(tags)
     y_pred = tagger.tag(input_feat)
-    return get_compressed(input_feat, y_pred)
+    new_sents = get_compressed(input_feat, y_pred)
+    new_sent_tokens = nltk.word_tokenize(new_sents)
+
+    return sentence(inputsent._idCode, new_sents, inputsent._index, inputsent._score, len(new_sent_tokens), create_dictionary(new_sent_tokens),inputsent._doctime)
 
 def create_a_tagger(training_file):
     data_list, ori_list, comp_list = read_training_file(training_file)
