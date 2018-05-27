@@ -57,7 +57,7 @@ def cs(docset, compression_rate, model_type):
 
     elif op.eq(model_name, COMBINED):
         sentence_matrix = sentence2matrix(allsentencelist, docset_tokenDict, idf)
-        check_metrix(sentence_matrix)
+        # check_metrix(sentence_matrix)
         sentence_similarity = calculate_sentence_similarity(sentence_matrix)
         important_score_vector1 = LexRank(sentence_similarity)
         new_sentence_list = replace_sentence_token_dict(allsentencelist, model_type)
@@ -87,11 +87,13 @@ def test_ave_score(docset, model_type):
     return sum1, sum2, count
 '''
 
+
 def combine_two_method(score_list1, score_list2):
     score = []
     for i in range(len(score_list1)):
         score.append(score_list1[i] * 0.25 + score_list2[i] * 0.75)
     return score
+
 
 # This function generates a sentence list of all sentences in a given docset.
 # list[data_preprocessing.sentence] generate_sentencelist(data_preprocesing.docSet)
