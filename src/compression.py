@@ -137,7 +137,7 @@ def get_compressed(X, Y):
             addr += (X[idx]+" ")
     return addr.strip()
 
-def check_stop(sent_tokens):
+def check_stopwords(sent_tokens):
     length = len(sent_tokens)
     n_s = 0
     for tok in sent_tokens:
@@ -167,8 +167,8 @@ def compress_sent(inputsent, tagger):
     y_pred = tagger.tag(input_feat)
     new_sents = get_compressed(sent_tokens, y_pred)
     new_sent_tokens = nltk.word_tokenize(new_sents)
-    if check_stop(new_sent_tokens):
-        return None
+    if check_stopwords(new_sent_tokens):
+        return sentence(inputsent._idCode, new_sents, inputsent._index, inputsent._score, 0, create_dictionary(new_sent_tokens),inputsent._doctime)
     else:
         return sentence(inputsent._idCode, new_sents, inputsent._index, inputsent._score, len(new_sent_tokens), create_dictionary(new_sent_tokens),inputsent._doctime)
 
