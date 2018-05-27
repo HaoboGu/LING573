@@ -3,6 +3,7 @@ import os
 import nltk
 import pycrfsuite
 from src.data_preprocessing import sentence
+import string
 
 stopwords = nltk.corpus.stopwords.words('english')
 negation = set(['not', 'no', "n't", "nt"])
@@ -141,7 +142,7 @@ def check_stopwords(sent_tokens):
     length = len(sent_tokens)
     n_s = 0
     for tok in sent_tokens:
-        if tok.lower() in stopwords:
+        if tok.lower() in stopwords or tok.lower() in string.punctuation:
             n_s += 1
         else:
             return False
