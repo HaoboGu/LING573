@@ -134,7 +134,7 @@ def get_compressed(X, Y):
     addr = ""
     for idx, label in enumerate(Y):
         if label == "I" or label == "B":
-            addr += (X[idx][1].split("=")[1]+" ")
+            addr += (X[idx]+" ")
     return addr.strip()
 
 def create_dictionary(sentence_tokens):
@@ -152,7 +152,7 @@ def compress_sent(inputsent, tagger):
 
     input_feat = extract_features(tags)
     y_pred = tagger.tag(input_feat)
-    new_sents = get_compressed(input_feat, y_pred)
+    new_sents = get_compressed(sent_tokens, y_pred)
     new_sent_tokens = nltk.word_tokenize(new_sents)
 
     return sentence(inputsent._idCode, new_sents, inputsent._index, inputsent._score, len(new_sent_tokens), create_dictionary(new_sent_tokens),inputsent._doctime)
