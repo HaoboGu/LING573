@@ -137,6 +137,19 @@ def get_compressed(X, Y):
             addr += (X[idx]+" ")
     return addr.strip()
 
+def check_stop(sent_tokens):
+    length = len(sent_tokens)
+    n_s = 0
+    for tok in sent_tokens:
+        if tok.lower() in stopwords:
+            n_s += 1
+        else:
+            return False
+    if n_s == length:
+        return True
+    else:
+        return False
+
 def create_dictionary(sentence_tokens):
     sent_dict = dict()
     for tok in sentence_tokens:
@@ -154,8 +167,10 @@ def compress_sent(inputsent, tagger):
     y_pred = tagger.tag(input_feat)
     new_sents = get_compressed(sent_tokens, y_pred)
     new_sent_tokens = nltk.word_tokenize(new_sents)
-
-    return sentence(inputsent._idCode, new_sents, inputsent._index, inputsent._score, len(new_sent_tokens), create_dictionary(new_sent_tokens),inputsent._doctime)
+    if check_stop(new_sent_tokens):
+        return None
+    else:
+        return sentence(inputsent._idCode, new_sents, inputsent._index, inputsent._score, len(new_sent_tokens), create_dictionary(new_sent_tokens),inputsent._doctime)
 
 def create_a_tagger(training_file):
     data_list, ori_list, comp_list = read_training_file(training_file)
