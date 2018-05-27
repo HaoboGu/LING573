@@ -313,11 +313,21 @@ def read_human_judgements(fullCorpus, dir):
                     docSet._humanSummary.append(str(data)) # load the human summary to the document set
     return fullCorpus
 
+def set_index(corpus):
+    for docset in corpus._docsetList:
+        for doc in docset._documentCluster:
+            num = 0
+            for sent in doc._sentences:
+                sent._index = num
+                num += 1
+    return corpus
+
 def generate_corpus(corpus_file, aqua, aqua2, human_judge):
     # generate the corpus
     fullCorpus = generate_corpus_from_xml(corpus_file) # fill in all the essential information, create the corpus
     fullCorpus = read_human_judgements(fullCorpus, human_judge) # fill in the human judgements
     fullCorpus = fill_in_corpus_data(fullCorpus, aqua, aqua2) # fill in the data from two datasets
+    fullCorpus = set_index(fullCorpus)
     return fullCorpus
 
 def generate_test_corpus(corpus_file, test_data, human_judge):
@@ -325,6 +335,7 @@ def generate_test_corpus(corpus_file, test_data, human_judge):
     fullCorpus = generate_corpus_from_xml(corpus_file) # fill in all the essential information, create the corpus
     fullCorpus = read_human_judgements(fullCorpus, human_judge) # fill in the human judgements
     fullCorpus = fill_in_corpus_data_test(fullCorpus, test_data) # fill in the data from two datasets
+    fullCorpus = set_index(fullCorpus)
     return fullCorpus
 
 if __name__ == "__main__":
@@ -336,7 +347,10 @@ if __name__ == "__main__":
     ifeval = sys.argv[5]
     """
     #fullCorpus = generate_corpus(training_corpus_file, aqua, aqua2, human_judge, ifeval)
-    fullCorpus = generate_test_corpus("dropbox/17-18/573/Data/Documents/evaltest/GuidedSumm11_test_topics.xml","dropbox/17-18/573/ENG-GW/data","dropbox/17-18/573/Data/models/evaltest")
+    #fullCorpus = generate_test_corpus("dropbox/17-18/573/Data/Documents/evaltest/GuidedSumm11_test_topics.xml","dropbox/17-18/573/ENG-GW/data","dropbox/17-18/573/Data/models/evaltest")
     #fullCorpus = generate_test_corpus("evaltest.xml","eval","Data/models/evaltest")
-    print(fullCorpus._docsetList[0]._documentCluster[0]._sentences[0]._content)
-    print(len(fullCorpus._docsetList))
+    #fullCorpus = generate_corpus("test_train.xml", "LDC02T31", "LDC08T25/data", "Data/models/training/2009")
+    #print(fullCorpus._docsetList[0]._documentCluster[0]._sentences[0]._content)
+
+    #for sent in fullCorpus._docsetList[0]._documentCluster[0]._sentences:
+    #    print(sent._index)
