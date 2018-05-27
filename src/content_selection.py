@@ -101,7 +101,7 @@ def generate_sentencelist(docset, tagger):
         sentences = doc.sentences()
         for sentence in sentences:
             sentence = comp.compress_sent(sentence, tagger)
-            if len(sentence.tokenDict()) > 0:
+            if len(sentence.length()) > 0:
                 sentencelist.append(sentence)
     return sentencelist
 
@@ -172,6 +172,8 @@ def matrix2tranmatrix(matrix):
     for i in range(size):
         sim_sum = matrix[i].sum()
         for j in range(size):
+            if math.isnan(matrix[i][j]) or math.isnan(sim_sum) or sim_sum == 0:
+                print()
             tranmatrix[i][j] = matrix[i][j] / sim_sum
     return tranmatrix
 
@@ -385,9 +387,11 @@ if __name__ == "__main__":
     type1 = "LexRank"
     type2 = "KL_Divergence"
     type3 = "Combined"
+    compress_corpus = data_home + "/other_resources/compression_corpus"
+    tagger = comp.create_a_tagger(compress_corpus)
     training_corpus = dp.generate_corpus(demo_training_corpus_file, aqua, aqua2, human_judge)
     docsetlist = training_corpus.docsetList()
-    cs_model = train_model(training_corpus, type3)
+    cs_model = train_model(training_corpus, type3, tagger)
 
     for docset in docsetlist:
         important_sentences = cs(docset, comprate, cs_model)

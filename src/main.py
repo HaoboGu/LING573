@@ -20,13 +20,13 @@ if __name__ == "__main__":
         aqua = data_home + "/AQUAINT"
         aqua2 = data_home + "/AQUAINT-2/data"
         human_judge = data_home + "/Data/models/training/2009"
-        # compress_corpus = data_home + "/other_resources/compression_corpus"
+        compress_corpus = data_home + "/other_resources/compression_corpus"
     else:
         training_corpus_file = sys.argv[1]
         aqua = sys.argv[2]
         aqua2 = sys.argv[3]
         human_judge = sys.argv[4]
-        # compress_corpus = sys.argv[5]
+        compress_corpus = sys.argv[5]
     print('Start...')
 
     comp_rate = 0.1  # The number of sentence selected
@@ -37,8 +37,7 @@ if __name__ == "__main__":
     type3 = "Combined"
 
     training_corpus = dp.generate_corpus(training_corpus_file, aqua, aqua2, human_judge)
-    # tagger = comp.create_a_tagger(compress_corpus)
-    tagger = ""
+    tagger = comp.create_a_tagger(compress_corpus)
     docset_list = training_corpus.docsetList()
     cs_model = cs.train_model(training_corpus, type3, tagger)
 
