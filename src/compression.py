@@ -134,8 +134,21 @@ def get_compressed(X, Y):
     addr = ""
     for idx, label in enumerate(Y):
         if label == "I" or label == "B":
-            addr += (X[idx][1].split("=")[1]+" ")
+            addr += (X[idx]+" ")
     return addr.strip()
+
+def check_stopwords(sent_tokens):
+    length = len(sent_tokens)
+    n_s = 0
+    for tok in sent_tokens:
+        if tok.lower() in stopwords:
+            n_s += 1
+        else:
+            return False
+    if n_s == length:
+        return True
+    else:
+        return False
 
 def create_dictionary(sentence_tokens):
     sent_dict = dict()
@@ -152,10 +165,12 @@ def compress_sent(inputsent, tagger):
 
     input_feat = extract_features(tags)
     y_pred = tagger.tag(input_feat)
-    new_sents = get_compressed(input_feat, y_pred)
+    new_sents = get_compressed(sent_tokens, y_pred)
     new_sent_tokens = nltk.word_tokenize(new_sents)
-
-    return sentence(inputsent._idCode, new_sents, inputsent._index, inputsent._score, len(new_sent_tokens), create_dictionary(new_sent_tokens),inputsent._doctime)
+    if check_stopwords(new_sent_tokens):
+        return sentence(inputsent._idCode, new_sents, inputsent._index, inputsent._score, 0, create_dictionary(new_sent_tokens),inputsent._doctime)
+    else:
+        return sentence(inputsent._idCode, new_sents, inputsent._index, inputsent._score, len(new_sent_tokens), create_dictionary(new_sent_tokens),inputsent._doctime)
 
 def create_a_tagger(training_file):
     data_list, ori_list, comp_list = read_training_file(training_file)

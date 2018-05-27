@@ -224,12 +224,14 @@ def calc_total_pref(u,v,Q,chro_exp,doc_dic):
     
 
 
-def sent_ordering(X,chro_exp):
+def sent_ordering(X,chro_exp,doc_dic):
     """
     ========================
     DESCRIPTION: this function takes an unsorted list of sentences and sort the sentences
     ========================
     INPUT: X: list[sentence]
+           chro_exp: chronological expert
+           doc_dic: document dictionary by id code
     ========================
     OUTPUT: sorted_list: sorted sentence list
     ========================

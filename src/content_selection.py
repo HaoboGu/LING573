@@ -57,6 +57,7 @@ def cs(docset, compression_rate, model_type):
 
     elif op.eq(model_name, COMBINED):
         sentence_matrix = sentence2matrix(allsentencelist, docset_tokenDict, idf)
+        check_metrix(sentence_matrix)
         sentence_similarity = calculate_sentence_similarity(sentence_matrix)
         important_score_vector1 = LexRank(sentence_similarity)
         new_sentence_list = replace_sentence_token_dict(allsentencelist, model_type)
@@ -99,10 +100,10 @@ def generate_sentencelist(docset, tagger):
     sentencelist = []
     for doc in docCluster:
         sentences = doc.sentences()
-        for sentence in sentences:
-            sentence = comp.compress_sent(sentence, tagger)
-            if len(sentence.length()) > 0:
-                sentencelist.append(sentence)
+        for sent in sentences:
+            sent = comp.compress_sent(sent, tagger)
+            if sent.length() > 0:
+                sentencelist.append(sent)
     return sentencelist
 
 
@@ -381,6 +382,15 @@ def train_model(corpus, model_type, tagger):
     elif op.eq(model_type, COMBINED):
         word_list_art, word_list_sum, art_matrix, sum_matrix = fc.feature_weight_calc(docsetlist)
         return model(model_type, idf, tagger, word_list_art, word_list_sum, art_matrix, sum_matrix)
+
+
+def check_metrix(m):
+    for i in range(len(m)):
+        if sum(m[i]) == 0:
+            print()
+        for j in range(len(m[i])):
+            if math.isnan(m[i][j]):
+                print()
 
 
 if __name__ == "__main__":
