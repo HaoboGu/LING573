@@ -10,63 +10,6 @@ import operator
 import nltk
 import numpy as np
 from scipy.spatial import distance
-import os
-import sys
-import re
-
-
-
-def sort_sentence_list(important_sentences):
-    """
-    ========================
-    DESCRIPTION: this function takes a list of sentence objects as input
-    and sort them in terms of publication date in recency and within-article indices.
-    ========================
-    INPUT: important_sentences: list[sentence]
-    ========================
-    OUTPUT: sent_list: list[sentence]
-    ========================
-    """
-    important_sentences.sort(key=lambda x: x.score(), reverse=True) # sort the sentences per score
-    
-    id_dic = {} # initialize a dictionary with idCode as keys and doctime as val
-    id_dic2 = {} # initialize another dictionary with idCode as keys
-    for s in important_sentences: # traverse through all sents
-        if s.idCode() not in id_dic: # fill in dicts
-            id_dic[s.idCode()] = s.doctime()
-            id_dic2[s.idCode()] = {}
-        id_dic2[s.idCode()][s.index()] = s # group sents w.r.t. idCode
-      
-    sorted_id_dic = sorted(id_dic.items(), key=operator.itemgetter(1)) # sort id_dic
-    
-    #word_count = 0 # initialize count for words of summary, capped at 100
-    sent_list = [] # initialize a list of sents for output
-    for i in sorted_id_dic: 
-        sent_id = i[0]
-        for j in id_dic2:
-            if j == sent_id: # first sort sents w.r.t. publication date
-                ind_list = list(id_dic2[j].keys())
-                ind_list_sorted = sorted(ind_list)
-                for m in ind_list_sorted: # second sort sents w.r.t. index
-                    sent = id_dic2[j][m]
-                    sent_list.append(sent)
-    return(sent_list)
-
-
-def write_to_file(docset,sent_list,output):
-    """
-    ========================
-    DESCRIPTION: this function takes a sorted list of sentences and write it to output files
-    ========================
-    INPUT: sent_list: list[sentence]
-    ========================
-    OUTPUT: None
-    ========================
-    """
-    with open(str(docset.idCode())+'.'+output,'w') as f1:
-        for s in sent_list:
-            f1.write(re.sub(r'\n',' ',s.content())+os.linesep)
-
 
             
             
@@ -100,6 +43,187 @@ def calc_chro_exp(important_sentences):
     return(chro_exp)
 
 
+def calc_cosine_sim(a,b):
+    """
+    ========================
+    DESCRIPTION: this function calculates the cosine similarity between two sentences
+    ========================
+    INPUT: a,b,: two sentence objects
+    ========================
+    OUTPUT: cosine similarity score
+    ========================
+    """
+    numerator = 0
+    denominator = 0
+    for i in a.tokenDict():
+        if i in b.tokenDict():
+            numerator+=a.tokenDict()[i]*b.tokenDict()[i]
+    denominator = np.sqrt(len(a.tokenDict()))+np.sqrt(len(b.tokenDict()))
+    return(numerator/denominator)
+
+def get_doc_dic(docset):
+    doc_cluster = docset.documentCluster()
+    doc_dic = {}
+    for i in doc_cluster:
+        if i.idCode() not in doc_dic:
+            doc_dic[i.idCode()] = i
+    return(doc_dic)
+
+def calc_topic_exp(u,v,Q):
+    """
+    ========================
+    DESCRIPTION: this function calculates topic-closeness expert preference score
+    ========================
+    INPUT: u,v: two sentence objects
+           Q: list of sentences that have been ordered
+    ========================
+    OUTPUT: topic-closeness expert preference score
+    ========================
+    """
+    topic_score_u = calc_topic_score(u,Q)
+    topic_score_v = calc_topic_score(v,Q)
+    if len(Q) == 0 or topic_score_u == topic_score_v:
+        return(0.5)
+    elif len(Q) != 0 and topic_score_u > topic_score_v:
+        return(1.0)
+    else:
+        return(0)
+
+def calc_topic_score(l,Q):
+    """
+    ========================
+    DESCRIPTION: this function calculates topic-closeness similarity
+    ========================
+    INPUT: l: a sentence object
+           Q: list of sentences that have been ordered
+    ========================
+    OUTPUT: topic-closeness similarity
+    ========================
+    """
+    if len(Q) == 0:
+        return(0.0)
+    else:
+        max_sim_candidate = []
+        for i in Q:
+            max_sim_candidate.append(calc_cosine_sim(l,i))
+        return(max(max_sim_candidate))
+
+
+def calc_pre_exp(u,v,Q):
+    """
+    ========================
+    DESCRIPTION: this function calculates precedence expert preference score
+    ========================
+    INPUT: u,v: two sentence objects
+           Q: list of sentences that have been ordered
+    ========================
+    OUTPUT: precedence expert preference score
+    ========================
+    """
+    pre_score_u = calc_pre_score(u,v,Q)
+    pre_score_v = calc_pre_score(v,u,Q)
+    if len(Q) == 0 or pre_score_u == pre_score_v:
+        return(0.5)
+    elif len(Q) != 0 and pre_score_u > pre_score_v:
+        return(1.0)
+    else:
+        return(0.0)
+
+def calc_pre_score(u,v,Q,doc_dic):
+    """
+    ========================
+    DESCRIPTION: this function calculates precedence similarity
+    ========================
+    INPUT: u,v: two sentence objects
+           Q: list of sentences that have been ordered
+    ========================
+    OUTPUT: precedence similarity
+    ========================
+    """
+    if len(Q) == 0:
+        return(0.0)
+    else:
+        sum_score = 0.0
+        for q in Q:
+            cur_doc = doc_dic[q.idCode()]
+            pre_sent_sim = []
+            for i in cur_doc.sentences():
+                if i.index() < q.index():
+                    pre_sent_sim.append(calc_cosine_sim(i,q))
+            if len(pre_sent_sim) == 0:
+                sum_score+=0
+            else:
+                sum_score+=max(pre_sent_sim)
+        return(sum_score/len(Q)) 
+
+
+def calc_succ_exp(u,v,Q):
+    """
+    ========================
+    DESCRIPTION: this function calculates succession expert preference score
+    ========================
+    INPUT: u,v: two sentence objects
+           Q: list of sentences that have been ordered
+    ========================
+    OUTPUT: succession expert preference score
+    ========================
+    """
+    succ_score_u = calc_succ_score(u,v,Q)
+    succ_score_v = calc_succ_score(v,u,Q)
+    if len(Q) == 0 or succ_score_u == succ_score_v:
+        return(0.5)
+    elif len(Q) != 0 and succ_score_u > succ_score_v:
+        return(1.0)
+    else:
+        return(0.0)
+
+def calc_succ_score(u,v,Q,doc_dic):
+    """
+    ========================
+    DESCRIPTION: this function calculates succession similarity
+    ========================
+    INPUT: u,v: two sentence objects
+           Q: list of sentences that have been ordered
+    ========================
+    OUTPUT: succession similarity
+    ========================
+    """
+    if len(Q) == 0:
+        return(0.0)
+    else:
+        sum_score = 0.0
+        for q in Q:
+            cur_doc = doc_dic[q.idCode()]
+            succ_sent_sim = []
+            for i in cur_doc.sentences():
+                if i.index() < q.index():
+                    succ_sent_sim.append(calc_cosine_sim(i,q))
+            if len(succ_sent_sim) == 0:
+                sum_score+=0
+            else:
+                sum_score+=max(succ_sent_sim)
+        return(sum_score/len(Q)) 
+
+def calc_total_pref(u,v,Q,chro_exp,doc_dic):
+    """
+    ========================
+    DESCRIPTION: this function calculates the total preference
+    ========================
+    INPUT: u,v: two sentence objects
+           Q: list of sentences that have been ordered
+           chro_exp: chronological expert
+    ========================
+    OUTPUT: total preference
+    ========================
+    """
+    chro_score = chro_exp[u][v]
+    pre_score = calc_pre_exp(u,v,Q,doc_dic)
+    succ_score = calc_succ_exp(u,v,Q,doc_dic)
+    topic_score = calc_topic_exp(u,v,Q)
+    return(0.327986*chro_score+0.016287*topic_score+0.196562*pre_score+0.444102*succ_score)
+    
+
+
 def sent_ordering(X,chro_exp):
     """
     ========================
@@ -117,13 +241,15 @@ def sent_ordering(X,chro_exp):
     for i in V:
         pi[i] = 0
         rho[i] = 0
+        
     for i in V:
         pi_i = 0
         for j in chro_exp[i]:
-            pi_i+=chro_exp[i][j]
+            pi_i+=calc_total_pref(i,j,Q,chro_exp,doc_dic)
         for j in chro_exp[i]:
-            pi_i-=chro_exp[j][i]
+            pi_i-=calc_total_pref(j,i,Q,chro_exp,doc_dic)
         pi[i] = pi_i
+        
     while len(pi)!=0:
         t = max(pi, key=pi.get)
         rho[t] = len(V)
@@ -135,64 +261,8 @@ def sent_ordering(X,chro_exp):
         pi = new_pi
         Q.append(t)
         for i in V:
-            pi[i] = pi[i]+chro_exp[t][i]-chro_exp[i][t]
+            pi[i] = pi[i]+calc_total_pref(t,i,Q,chro_exp,doc_dic)-calc_total_pref(i,t,Q,chro_exp,doc_dic)
     sorted_list = sorted(rho, key=rho.get, reverse=True)
     return(sorted_list)
-
-
-
-def io_wrapper(training_corpus_file,aqua,aqua2,human_judge,output):
-    """
-    ========================
-    DESCRIPTION: this function is a wrapper which loads and process the training documents, extract important sentences,
-    and sort the sentences in order.
-    ========================
-    """
-    # read in and preprocess documents
-    sys.stderr.write("Start preprocessing documents ...\n")
-    training_corpus = dp.generate_corpus(training_corpus_file,aqua,aqua2,human_judge)
-    sys.stderr.write("--- Finished preprocessing documents ......\n")
-    
-    # extract sentences
-    docsetlist = training_corpus.docsetList()
-    docset_dic = {}
-    for docset in docsetlist: # traverse through all document sets
-        if docset.idCode() not in docset_dic:
-            docset_dic[docset.idCode()] = []
-        sys.stderr.write("Start extracting important sentences for docset: "+str(docset.idCode())+"\n")
-        important_sentences = cs.cs(docset, compression_rate=cs.comprate) # content selection
-        sent_list = sort_sentence_list(important_sentences) # sort important sentences
-        docset_dic[docset.idCode()] = sent_list
-        sys.stderr.write("--- Finished extracting important sentences ......\n")
-        
-        # write to output files
-        sys.stderr.write("Start writing to file ...\n")
-        write_to_file(docset,sent_list,output)
-        sys.stderr.write("--- Finished writing to file ......\n")
-    return(docset_dic)
-    
-    
-    
-            
-            
-if __name__ == "__main__":
-    sys.stderr.write("------ Start ------\n")
-    
-    # test variable(s) for output
-    output = sys.argv[1]
-    
-    # read in and preprocess documents
-    """
-    FIXME: Please modify the data directory (in content selection script) before running the following line of code.
-    FIXME: This script assumes the same directory as other modules
-    """
-    docset_dic = io_wrapper(cs.demo_training_corpus_file,cs.aqua,cs.aqua2,cs.human_judge,output)
-    
-    sys.stderr.write("------ Finished ------\n")
-            
-            
-        
-
-
 
 
