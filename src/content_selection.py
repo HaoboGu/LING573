@@ -18,7 +18,7 @@ LEXRANK = "LexRank"
 KL_DIVERGENCE = "KL_Divergence"
 COMBINED = "Combined"
 
-SENT_LEN_THRESHOLD = 8
+SENT_LEN_THRESHOLD = 10
 
 
 class model:

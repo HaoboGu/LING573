@@ -16,6 +16,7 @@ if __name__ == "__main__":
         data_home = ".."
         # training_corpus_file = data_home + "/Data/Documents/training/2009/UpdateSumm09_test_topics.xml"
         training_corpus_file = data_home + "/Data/UpdateSumm09_demo_test_topics18.xml"
+        # training_corpus_file = data_home + "/Data/Documents/devtest/GuidedSumm10_test_topics.xml"
         aqua = data_home + "/AQUAINT"
         aqua2 = data_home + "/AQUAINT-2/data"
         human_judge = data_home + "/Data/models/training/2009"
@@ -40,15 +41,17 @@ if __name__ == "__main__":
     tagger = ""
     docset_list = training_corpus.docsetList()
     cs_model = cs.train_model(training_corpus, type3, tagger)
+
+    content_realization = cr.ContentRealization(solver="compression_ilp", lambda1=0.5, lambda2=0.5,
+                                                output_folder_name='D3',
+                                                prune_pipe=[])
+
     for docset in docset_list:
         print("Processing docset", docset.idCode())
         important_sentences = cs.cs(docset, comp_rate, cs_model)
         chro_exp = io.calc_chro_exp(important_sentences)
         doc_dic = io.get_doc_dic(docset)
         sent_list = io.sent_ordering(important_sentences, chro_exp, doc_dic)
-        content_realization = cr.ContentRealization(solver="improved_ilp", lambda1=0.5, lambda2=0.5,
-                                                    output_folder_name='D3',
-                                                    prune_pipe=[])
         content_realization.cr(sent_list, docset.idCode())
 
     print("Complete!")

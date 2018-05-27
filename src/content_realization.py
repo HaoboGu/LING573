@@ -8,12 +8,14 @@
 """
 
 from src.writer import write
+from nltk.corpus import stopwords
 import nltk
 import numpy as np
 import pulp
 import spacy
 import re
 import string
+import src.data_preprocessing as dp
 
 
 class ContentRealization:
@@ -35,6 +37,8 @@ class ContentRealization:
         self.nlp = spacy.load('en')
         self.output_folder_name = output_folder_name
         self.prune_pipe = prune_pipe
+        self.puncts = set(string.punctuation)
+        self.stopwords_set = set(stopwords.words('english')).union(self.puncts)
 
     def cr(self, scu, topic_id):
         """
@@ -48,8 +52,8 @@ class ContentRealization:
             self._linear_prog(scu, topic_id)
         elif self.solver == 'improved_ilp':
             self._improved_ilp(scu, topic_id)
-        # elif self.solver == 'parse_tree':
-        #     self._parse_tree(scu, topic_id)
+        elif self.solver == 'compression_ilp':
+            self._compression_ilp(scu, topic_id)
 
     def prune_pipeline(self, scu, prune_pipe):
         """
@@ -57,13 +61,11 @@ class ContentRealization:
         :param scu: list of sentence
         :param prune_pipe: the order of pruning methods
         """
-        print('Start pruning ...')
         for prune_type in prune_pipe:
-            scu = self._prune(scu, prune_type)
-        print('Finish pruning ...')
+            scu = self._prune_all(scu, prune_type)
         return scu
 
-    def _prune(self, scu, prune_type):
+    def _prune_all(self, scu, prune_type):
         """
         Prune sentences by removing unnecessary constituents. Modify scu in place.
         :param scu: list of sentence
@@ -71,70 +73,70 @@ class ContentRealization:
         """
         for index, item in enumerate(scu):
             sent = item.content()
-            if prune_type == 'parenthesis':
-                sent = re.sub(self.parenthesis_re, '', sent).strip(' ')  # remove all contents in a pair of parenthesis
-                sent = re.sub(self.space_re, ' ', sent).strip(' ')
-            elif prune_type == 'advcl':
-                tokens = self.nlp(sent)
-                if len(tokens) == 0:
-                    continue
-                if tokens[0].dep_ == 'advcl' or tokens[0].dep_ == 'prep':
-                    # If sentence starts with a short adv clause, remove this clause
-                    # Or if sentence starts with a short preposition phrase, remove it as well
-                    if ',' in sent[0:100]:
-                        # print('remove:', sent[:sent.find(',')])
-                        # print('original sentence:', sent)
-                        sent = sent[sent.find(',')+1:].strip().capitalize()
-            elif prune_type == 'apposition':
-                tokens = self.nlp(sent)
-                if len(tokens) == 0:
-                    continue
-                # Remove apposition
-                for token in tokens:
-                    if token.dep_ == 'appos':
-                        same_layer = [x for x in token.head.children]
-                        pos_in_layer = same_layer.index(token)
-                        if pos_in_layer - 1 >= 0 and pos_in_layer + 1 < len(same_layer) and \
-                                same_layer[pos_in_layer-1].dep_ == 'punct' and same_layer[pos_in_layer+1].dep_ == 'punct':
-                            appo_start = same_layer[pos_in_layer-1].i
-                            appo_end = same_layer[pos_in_layer+1].i
-                            print('\"', tokens[appo_start:appo_end], '\" is removed')
-                            print('       sent:', sent)
-                            sent = tokens[:appo_start].text + tokens[appo_end:].text
-                            print('pruned sent:', sent, '\n ------')
-                            break  # prune only one apposition for each sentence
-                        else:
-                            # Get the subtree of apposition
-                            subtree = [x for x in token.subtree]
-                            if subtree[0].dep_ == 'punct':
-                                appo_start = subtree[0].i
-                            else:
-                                appo_start = subtree[0].i - 1
-                            if subtree[-1].dep_ == 'punct':
-                                appo_end = subtree[-1].i
-                            elif subtree[-1].i + 1 < len(tokens):
-                                appo_end = subtree[-1].i + 1
-                            else:
-                                appo_end = subtree[-1].i
-                            # If the apposition is surrounded by puncs, remove it
-                            if tokens[appo_end].dep_ == 'punct' and tokens[appo_start].dep_ == 'punct':
-                                print(subtree, 'is removed')
-                                print('       sent:', sent)
-                                sent = tokens[:appo_start].text + tokens[appo_end:].text
-                                print('pruned sent:', sent, '\n ------')
-                                break  # prune only one apposition for each sentence
-
+            sent = self._prune_sentence(sent, prune_type)
+            print('pruned sentence:', sent)
             # Re-calculate sentence length
-            n_puncs = 0
-            word_seq = nltk.word_tokenize(sent)
-            for word in word_seq:
-                if word in string.punctuation:
-                    n_puncs += 1
+            new_length = self._get_length(sent)
             # Update scu
             scu[index].set_content(sent)
-            scu[index].set_length(len(word_seq)-n_puncs)
+            scu[index].set_length(new_length)
 
         return scu
+
+    def _prune_sentence(self, sent, prune_type):
+        """
+        Apply prune compression methods on sentence and return pruned string
+        :param sent: str
+        :param prune_type: str
+        :return: str
+        """
+        if prune_type == 'parenthesis':
+            # Remove all contents in parenthesis
+            sent = re.sub(self.parenthesis_re, '', sent).strip(' ')
+            sent = re.sub(self.space_re, ' ', sent).strip(' ')
+        elif prune_type == 'advcl':
+            tokens = self.nlp(sent)
+            if len(tokens) == 0:
+                return ''
+            if tokens[0].dep_ == 'advcl' or tokens[0].dep_ == 'prep':
+                # If sentence starts with a short adv clause, remove this clause
+                # Or if sentence starts with a short preposition phrase, remove it as well
+                if ',' in sent[0:100]:
+                    sent = sent[sent.find(',') + 1:].strip().capitalize()
+        elif prune_type == 'apposition':
+            tokens = self.nlp(sent)
+            if len(tokens) == 0:
+                return ''
+            # Remove apposition
+            for token in tokens:
+                if token.dep_ == 'appos':
+                    same_layer = [x for x in token.head.children]  # all elements in current layer
+                    pos_in_layer = same_layer.index(token)  # index of apposition in current layer
+                    if pos_in_layer - 1 >= 0 and pos_in_layer + 1 < len(same_layer) and \
+                            same_layer[pos_in_layer - 1].dep_ == 'punct' and \
+                            same_layer[pos_in_layer + 1].dep_ == 'punct':
+                        appo_start = same_layer[pos_in_layer - 1].i
+                        appo_end = same_layer[pos_in_layer + 1].i
+                        sent = tokens[:appo_start].text + tokens[appo_end:].text
+                        break  # prune only one apposition for each sentence
+                    else:
+                        # Get the subtree of apposition
+                        subtree = [x for x in token.subtree]
+                        if subtree[0].dep_ == 'punct':
+                            appo_start = subtree[0].i
+                        else:
+                            appo_start = subtree[0].i - 1
+                        if subtree[-1].dep_ == 'punct':
+                            appo_end = subtree[-1].i
+                        elif subtree[-1].i + 1 < len(tokens):
+                            appo_end = subtree[-1].i + 1
+                        else:
+                            appo_end = subtree[-1].i
+                        # If the apposition is surrounded by puncs, remove it
+                        if tokens[appo_end].dep_ == 'punct' and tokens[appo_start].dep_ == 'punct':
+                            sent = tokens[:appo_start].text + tokens[appo_end:].text
+                            break  # prune only one apposition for each sentence
+        return sent
 
     def _get_summarizations(self, scu):
         """
@@ -144,13 +146,12 @@ class ContentRealization:
         """
         total_length = 0
         summary = []
-        sent_lens = get_lengths(scu)
         # Add sentences to summary
         for index, item in enumerate(scu):
             # Total length of summary should not larger than 100
-            if total_length + sent_lens[index] <= self.max_length:
+            if total_length + item.length() <= self.max_length:
                 summary.append(item.content())
-                total_length += sent_lens[index]
+                total_length += item.length()
         return summary
 
     def _simple_cr(self, scu, topic_id):
@@ -169,21 +170,20 @@ class ContentRealization:
         :param scu: a list of sentence
         :param topic_id: topic id for this docset
         """
-        bigram_dict, bigram_set = get_bigrams(scu)
+        bigram_dict, bigram_set, bigram_freq = self._get_bigrams(scu)
         n_sentence = len(scu)  # number of sentences
         n_bigram = len(bigram_set)  # number of different bigrams
         bigram_list = list(bigram_set)
 
         # Get lengths for all sentences
-        sent_lens = get_lengths(scu)
-        min_sent_len = min(sent_lens)  # get number of words in shortest sentence
+        min_sent_len = 8  # get number of words in shortest sentence
 
         # Calculate coefficients in target function
         # All coefs are divided to two parts: importance(imp) and diversity(div)
         target_imp_coef = np.zeros(n_sentence)
         target_div_coef = np.zeros(n_bigram)
         for i in range(n_sentence):
-            target_imp_coef[i] = self.lambda1 * scu[i].score() * sent_lens[i] / (self.max_length / min_sent_len)
+            target_imp_coef[i] = self.lambda1 * scu[i].score() * scu[i].length() / (self.max_length / min_sent_len)
         for i in range(n_bigram):
             target_div_coef[i] = self.lambda2 / n_sentence
         # target_coef = np.concatenate((target_imp_coef, target_div_coef), axis=0)
@@ -254,8 +254,8 @@ class ContentRealization:
         :param scu: list[Sentence]
         :param topic_id: topic id for this docset
         """
-        scu = self.prune_pipeline(scu, self.prune_pipe)
-        bigram_dict, bigram_set = get_bigrams(scu)
+        # scu = self.prune_pipeline(scu, self.prune_pipe)
+        bigram_dict, bigram_set, bigram_freq = self._get_bigrams(scu)
         n_bigram = len(bigram_set)
         n_sent = len(scu)
 
@@ -270,7 +270,7 @@ class ContentRealization:
                 if bigram not in bigram_freq:
                     bigram_freq[bigram] = 1 + delta * (n_sent - index)
                 else:
-                    bigram_freq[bigram] = bigram_freq[bigram]  + 1 + delta * (n_sent - index)
+                    bigram_freq[bigram] = bigram_freq[bigram] + 1 + delta * (n_sent - index)
         bigram_list = list(bigram_set)  # the order of bigram variables
         # Use frequency of bigram as its weight
         weight = []
@@ -336,67 +336,205 @@ class ContentRealization:
         # Write result
         write(summary, topic_id, output_folder_name=self.output_folder_name, over_write=True)
 
+    def _generate_compressed_candidate(self, sent):
+        """
+        Generate compressed sentence candidates, including original sentence
+        :param sent: sentence object
+        :return: list[sentence]
+        """
+        candidate = [sent]
+        exist_sent = [sent.content()]
+        for prune_type in self.prune_pipe:
+            sent_content = sent.content()
+            pruned_sent = self._prune_sentence(sent_content, prune_type)
+            if pruned_sent not in exist_sent and pruned_sent != '':
+                # Only add different sentences to the set
+                new_length = self._get_length(pruned_sent)
+                candidate.append(dp.sentence(sent.idCode(), pruned_sent, sent.index(), sent.score(),
+                                             new_length, sent.tokenDict(), sent.doctime()))
+        return candidate
 
-# Helper functions
-def get_lengths(scu):
-    """
-    Get lengths for all sentences
-    :param scu: list of sentence
-    :return: list of lengths
-    """
-    sent_lens = []  # list of lengths for sentences
-    for sent in scu:
-        sent_lens.append(len(nltk.word_tokenize(sent.content())))
-    return sent_lens
+    def _compression_ilp(self, scu, topic_id):
+        """
+        Content realization by combining ILP and sentence compression
+        :param scu: list[sentence]
+        :param topic_id: str
+        """
+        # Get pruned sentences
+        all_candidates = []
+        group_lengths = []
+        for item in scu:
+            candidates = self._generate_compressed_candidate(item)
+            all_candidates += candidates
+            group_lengths.append(len(candidates))
+        bigram_dict, bigram_set, bigram_freq = self._get_bigrams(all_candidates)
+        n_bigram = len(bigram_set)
+        n_sent = len(all_candidates)
+        bigram_list = list(bigram_set)  # the order of bigram variables
 
+        # Calculate weights in objective function
+        # Use number of occurrences of bigram as its weight
+        weight = []
+        for i in range(n_bigram):
+            weight.append(bigram_freq[bigram_list[i]])
+        # Give a very small weight to every sentence to reduce randomness
+        weight_s = np.zeros(n_sent)
+        delta = 0.005
+        for i in range(n_sent):
+            weight_s[i] = delta * (n_sent - i)
+        weight = np.concatenate((np.array(weight), weight_s), axis=0)  # add s_j after c_i
 
-def get_bigrams(scu):
-    """
-    Get all bigrams from a list of sorted scu
-    :param scu: a list of sentences
-    :return bigram_dict: each sentence's bigrams, key is the sentence's index
-    :return bigram_set: a set of all bigrams
-    """
-    bigram_dict = {}
-    bigram_set = set()
-    for index, sent in enumerate(scu):
-        bigrams = []
-        word_seq = nltk.word_tokenize(sent.content())
-        for word_index in range(0, len(word_seq)-1):  # for all bigrams
-            bigrams.append((word_seq[word_index], word_seq[word_index+1]))
-        bigram_dict[index] = bigrams  # key is the order of the sentence
-        bigram_set = bigram_set.union(set(bigrams))
-    return bigram_dict, bigram_set
+        # Calculate coefs
+        # Variable: c_i, s_j
+
+        # First, calculate coefs for constraints 1 and 2.
+        n_constraint = 0
+        coefs_1 = []  # constraint 1, i*j rows
+        coefs_2 = []  # constraint 2, i rows
+        for i in range(n_bigram):
+            coefs_sum_s = np.zeros(n_sent)
+            for j in range(n_sent):
+                coefs_c = np.zeros(n_bigram)
+                coefs_s = np.zeros(n_sent)
+                if bigram_list[i] in bigram_dict[j]:
+                    # c_i in s_j, s_j - c_i <= 0
+                    coefs_c[i] = -1
+                    coefs_s[j] = 1
+                    coefs_sum_s[j] = -1
+                    coefs_1.append(np.concatenate((coefs_c, coefs_s), axis=0))
+                    n_constraint += 1
+            coefs_sum_c = np.zeros(n_bigram)
+            coefs_sum_c[i] = 1
+            coefs_2.append(np.concatenate((coefs_sum_c, coefs_sum_s), axis=0))
+            n_constraint += 1
+
+        # Constraint 3, length constraint, 1 row
+        coefs_3_s = np.zeros(n_sent)
+        for i in range(n_sent):
+            coefs_3_s[i] = all_candidates[i].length()
+
+        # Constraint for each group of compressed candidates
+        coefs_4 = []
+        cur_pos = 0  # current position
+        for n_group in group_lengths:
+            coefs_4_s = np.zeros(n_sent)
+            coefs_4_c = np.zeros(n_bigram)
+            coefs_4_s[cur_pos:cur_pos+n_group] = 1
+            coefs_4.append(np.concatenate((coefs_4_c, coefs_4_s), axis=0))
+            cur_pos = cur_pos + n_group
+
+        # Use pulp to solve ILP problem
+        ilp_model = pulp.LpProblem('content realization', pulp.LpMaximize)
+        # Define variables
+        sentences = pulp.LpVariable.dict("sentence", (i for i in range(n_sent)),
+                                         lowBound=0, upBound=1, cat=pulp.LpInteger)
+        concepts = pulp.LpVariable.dict("concept", (i for i in range(n_bigram)),
+                                        lowBound=0, upBound=1, cat=pulp.LpInteger)
+        # Add objective function
+        ilp_model += pulp.lpSum([weight[int(key)] * concepts[key] for key in concepts]), "Objective function"
+        # Add length constraint
+        ilp_model += pulp.lpSum([coefs_3_s[int(key)] * sentences[key] for key in sentences]) <= self.max_length
+        # Add constraints 1
+        for coefs in coefs_1:
+            ilp_model += pulp.lpSum([coefs[key] * concepts[key] for key in concepts] +
+                                    [coefs[key2 + n_bigram] * sentences[key2] for key2 in sentences]) <= 0
+        # Add constraints 2
+        for coefs in coefs_2:
+            ilp_model += pulp.lpSum([coefs[key] * concepts[key] for key in concepts] +
+                                    [coefs[key2 + n_bigram] * sentences[key2] for key2 in sentences]) <= 0
+
+        # Add constraints 4
+        for coefs in coefs_4:
+            ilp_model += pulp.lpSum([coefs[key] * concepts[key] for key in concepts] +
+                                    [coefs[key2 + n_bigram] * sentences[key2] for key2 in sentences]) <= 1
+
+        # ilp_model.writeLP('ilp_model')  # write ilp model to file
+        ilp_model.solve(pulp.PULP_CBC_CMD())
+        indices = np.array([sentences[key].value() for key in sentences])
+        indices[indices == None] = 0
+        summary = [sent.content() for sent in np.array(all_candidates)[indices > 0.1]]
+        # Write result
+        write(summary, topic_id, output_folder_name=self.output_folder_name, over_write=True)
+
+    def _get_length(self, sent):
+        """
+        Get sentence length, without counting punctuations
+        :param sent: str
+        :return: int
+        """
+        n_puncs = 0
+        word_seq = nltk.word_tokenize(sent)
+        for word in word_seq:
+            if word in self.puncts:
+                n_puncs += 1
+        new_length = len(word_seq) - n_puncs
+        return new_length
+
+    def _get_bigrams(self, scu):
+        """
+        Get all bigrams from a list of sorted scu
+        :param scu: a list of sentences
+        :return bigram_dict: each sentence's bigrams, key is the sentence's index
+        :return bigram_set: a set of all bigrams
+        :return bigram_freq: number of bigram occurrences in different sentences
+        """
+        bigram_dict = {}
+        bigram_set = set()
+        bigram_freq = {}
+        for index, sent in enumerate(scu):
+            bigrams = []
+            word_seq = nltk.word_tokenize(sent.content())
+            for word_index in range(0, len(word_seq)-1):  # for all bigrams
+                if (word_seq[word_index] in self.stopwords_set) and (word_seq[word_index+1] in self.stopwords_set):
+                    print('stopwords: ', word_seq[word_index], word_seq[word_index+1])
+                else:
+                    # Exclude bigrams consist of stopwords
+                    bigrams.append((word_seq[word_index], word_seq[word_index + 1]))
+                    # Count bigram's frequency
+                    if (word_seq[word_index], word_seq[word_index + 1]) not in bigram_freq:
+                        bigram_freq[(word_seq[word_index], word_seq[word_index + 1])] = {sent.idCode()}
+                    else:
+                        bigram_freq[(word_seq[word_index], word_seq[word_index + 1])].add(sent.idCode())
+            bigram_dict[index] = bigrams  # key is the order of the sentence
+            bigram_set = bigram_set.union(set(bigrams))
+        for key in bigram_freq:
+            bigram_freq[key] = len(bigram_freq[key])
+        return bigram_dict, bigram_set, bigram_freq
 
 
 # Test script
 if __name__ == "__main__":
-    import src.data_preprocessing as dp
     import src.content_selection as cs
     import src.information_ordering as io
-    print('Start...')
 
     # Paths and variables
-    data_home = "."
-    training_corpus_file = data_home + "/Data/Documents/training/2009/UpdateSumm09_test_topics.xml"
-    demo_training_corpus_file = data_home + "/Data/UpdateSumm09_demo_test_topics18.xml"
+
+    data_home = ".."
+    # training_corpus_file = data_home + "/Data/Documents/training/2009/UpdateSumm09_test_topics.xml"
+    training_corpus_file = data_home + "/Data/UpdateSumm09_demo_test_topics18.xml"
+    # training_corpus_file = data_home + "/Data/Documents/devtest/GuidedSumm10_test_topics.xml"
     aqua = data_home + "/AQUAINT"
     aqua2 = data_home + "/AQUAINT-2/data"
     human_judge = data_home + "/Data/models/training/2009"
+    print('Start...')
+
     comp_rate = 0.1  # The number of sentence selected
     converge_standard = 0.001  # Used to judge if the score is converging
 
     print("Reading Corpus...")
-    training_corpus = dp.generate_corpus(demo_training_corpus_file, aqua, aqua2, human_judge)
+    type2 = "KL_Divergence"
+    type3 = "Combined"
+    training_corpus = dp.generate_corpus(training_corpus_file, aqua, aqua2, human_judge)
     docset_list = training_corpus.docsetList()
-    docset_dic = {}
-    for docset in docset_list:  # traverse through all document sets
+    cs_model = cs.train_model(training_corpus, type3)
+    content_realization = ContentRealization(solver="compression_ilp", lambda1=0.5, lambda2=0.5,
+                                                output_folder_name='D3',
+                                                prune_pipe=['apposition', 'advcl', 'parenthesis'])
+    for docset in docset_list:
         print("Processing docset", docset.idCode())
-        important_sentences = cs.cs(docset, compression_rate=comp_rate)  # content selection
-        sent_list = io.sort_sentence_list(important_sentences)  # sort important sentences
-        content_realization = ContentRealization(solver="improved_ilp")  # use improved ILP solver in cr
+        important_sentences = cs.cs(docset, comp_rate, cs_model)
+        chro_exp = io.calc_chro_exp(important_sentences)
+        sent_list = io.sent_ordering(important_sentences, chro_exp)
         content_realization.cr(sent_list, docset.idCode())
 
-
-
-
+    print("Complete!")
