@@ -27,6 +27,7 @@ if __name__ == "__main__":
         aqua2 = sys.argv[3]
         human_judge = sys.argv[4]
         compress_corpus = sys.argv[5]
+        eval_data = sys.argv[6]
     print('Start...')
 
     comp_rate = 0.1  # The number of sentence selected
@@ -35,14 +36,16 @@ if __name__ == "__main__":
     print("Reading Corpus...")
     type2 = "KL_Divergence"
     type3 = "Combined"
-
-    training_corpus = dp.generate_corpus(training_corpus_file, aqua, aqua2, human_judge)
+    if "evaltest" in training_corpus_file:
+        training_corpus = dp.generate_test_corpus(training_corpus_file, eval_data, human_judge)
+    else:
+        training_corpus = dp.generate_corpus(training_corpus_file, aqua, aqua2, human_judge)
     tagger = comp.create_a_tagger(compress_corpus)
     docset_list = training_corpus.docsetList()
     cs_model = cs.train_model(training_corpus, type3, tagger)
 
     content_realization = cr.ContentRealization(solver="compression_ilp", lambda1=0.5, lambda2=0.5,
-                                                output_folder_name='D3',
+                                                output_folder_name='D4_0.1_eval3',
                                                 prune_pipe=[])
 
     for docset in docset_list:
