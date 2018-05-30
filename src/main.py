@@ -45,7 +45,7 @@ if __name__ == "__main__":
     cs_model = cs.train_model(training_corpus, type3, tagger)
 
     content_realization = cr.ContentRealization(solver="compression_ilp", lambda1=0.5, lambda2=0.5,
-                                                output_folder_name='D4_0.1_eval3',
+                                                output_folder_name='D4',
                                                 prune_pipe=[])
 
     for docset in docset_list:
