@@ -23,6 +23,7 @@
 \usepackage{graphicx}
 \usepackage{algorithm}
 \usepackage[noend]{algpseudocode}
+\usepackage{appendix}
 
 \makeatletter
 \def\BState{\State\hskip-\ALG@thistlm}
@@ -188,17 +189,17 @@ This paper also proposed an algorithm for learning weights for each experts. We 
 
 \subsection{Content Realization}
 
-In our content realization module, we implemented an Integer Linear Programming (ILP) method which was proposed by Gillick and Farve Gillick. We use a new objective function which maximizes the weighted summary of all presence bigrams:  
+In our content realization module, we implemented an Integer Linear Programming (ILP) method which was proposed by Dan Gillick and Benoit Farve. We use a new objective function which maximizes the weighted summary of all presence bigrams:  
 \begin{equation}
 	\sum_i{w_ic_i}
 \end{equation} 
-where $c_i$ is the presence of bigram $i$ and $w_i$ is the weight. Each bigram has an associated weight, which is the number of sentence it appears in. Intuitively, the more bigrams appear in the summary, the better the summary is. 
+where binary variable $c_i$ is the presence of bigram $i$ and $w_i$ is the weight. Each bigram has an associated weight, which is the number of document it appears in. Intuitively, the more bigrams appear in the summary, the better the summary is. In our implementation, we modified the target function by removing all bigrams consist of stop-words and punctuations, only meaningful bigrams are considered in the target function. 
 
 Besides presences of bigrams, we also have presences of sentences as variables, which are what we actually want by solving the ILP problem. We have three constraints in our ILP problem. The first constraint is the length constraint:
 \begin{equation}
 	\sum_j{l_js_j} \leq L 
 \end{equation} 
-where $s_j$ is the presence of the sentence $j$, $l_j$ is the length of sentence $j$, and $L$ is the maximum summary length. 
+where binary variable $s_j$ is the presence of the sentence $j$, $l_j$ is the length of sentence $j$, and $L$ is the maximum summary length. What's more, we also add a small weight for each sentence variable $s_j$ to reduce the randomness, which is introduced by the ILP algorithm. 
 
 The second and third constraints are about relationships between $s_j$ and $c_i$. Here, we use $Occ_{ij}$ to indicate the occurrence of bigram $i$ in sentence $j$. Obviously, $Occ_{ij}$ is a constant matrix which should be calculated before solving the ILP problem. With $Occ_{ij}$, we can formulate the following constraints:
 \begin{equation}
@@ -226,9 +227,12 @@ Hence, the final ILP problem we established for content realization is:
 \indent
 By maximizing the target function, a set of sentences is generated. Finally, those generated sentences are organized to the summary using the order we got from information ordering module.
 
+In our implementation, we also incorporate several sentence compression methods with the ILP content realization approach. All selected sentences are compressed by removing some constituents. We tried three types of removal: clauses starting with an adverb, appositions and contents in parentheses. For each sentence, three compressed sentences are generated. Together with the original sentence, four sentences are added as candidates for summary. We use an extra constraint to ensure that only one sentence in four candidates will be chosen in final summary. 
+
 \section{Results}
 
-We trained our model on the training dataset and test on the devtest dataset and evaltest dataset. After that, we used the ROUGE script to compare the generated summaries and the human summaries (as gold standard). comp is the parameter we are using for content selection part, meaning the ratio of sentences we select for next steps.
+We trained our model on the training dataset and test on the devtest dataset and evaltest dataset. After that, we used the ROUGE script to compare the generated summaries and the human summaries (as gold standard). comp is the parameter we are using for content selection part, meaning the ratio of sentences we select for next steps. 
+
 \begin{table}[!ht]
 \centering
 \caption{ROUGE Results for devtest (comp=0.1)}
@@ -240,7 +244,8 @@ ROUGE-2 & 0.07090 & 0.07820   & 0.07428 \\ \hline
 ROUGE-3 & 0.02435 & 0.02695   & 0.02556 \\ \hline
 ROUGE-4 & 0.00946 & 0.01051   & 0.00994 \\ \hline
 \end{tabular}
-\end{table}\\
+\end{table}
+
 \begin{table}[!ht]
 \centering
 \caption{ROUGE Results for evaltest (comp=0.1)}
@@ -252,7 +257,8 @@ ROUGE-2 & 0.07803 & 0.08579   & 0.08144 \\ \hline
 ROUGE-3 & 0.02898 & 0.03175   & 0.03019 \\ \hline
 ROUGE-4 & 0.01467 & 0.01591   & 0.01521 \\ \hline
 \end{tabular}
-\end{table}\\
+\end{table}
+
 Also, we tried to use a high comp rate for test, which means reserving more sentences during the selection part for information ordering and realization. Although the program running time is very long (more than 24 hours), the results show a very strong improvement.\\
 \begin{table}[!ht]
 \centering
@@ -278,8 +284,8 @@ ROUGE-3 & 0.03314 & 0.03792   & 0.03524 \\ \hline
 ROUGE-4 & 0.01579 & 0.01808   & 0.01679 \\ \hline
 \end{tabular}
 \end{table}\\
-\indent
 
+\indent
 Our improved system performs far better than our original system, except the Rouge-1 Recall score. The improvement rate is shown below:
 \begin{center}
 \includegraphics[width=0.45\textwidth]{perc_d4.png}
@@ -347,6 +353,9 @@ Text Summarization.}
 
 
 \end{thebibliography}
+
+
+
 
 \end{document}
 
