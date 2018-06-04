@@ -9,7 +9,8 @@
 \usepackage{algorithm}
 \usepackage[noend]{algpseudocode}
 \usepackage{appendix}
-
+\usepackage{caption}
+\usepackage{framed}
 \makeatletter
 \def\BState{\State\hskip-\ALG@thistlm}
 \makeatother
@@ -233,13 +234,13 @@ where binary variable $s_j$ is the presence of the sentence $j$, $l_j$ is the le
 
 The second and third constraints are about relationships between $s_j$ and $c_i$. Here, we use $Occ_{ij}$ to indicate the occurrence of bigram $i$ in sentence $j$. Obviously, $Occ_{ij}$ is a constant matrix which should be calculated before solving the ILP problem. With $Occ_{ij}$, we can formulate the following constraints:
 \begin{equation}
-	s_jOcc_{ij} \leq c_i\ \  \forall i,j
+	s_jOcc_{ij} \leq c_i\ \  \forall i,j\label{cons1}
 \end{equation}
 \begin{equation}
-	\sum_j s_jOcc_{ij} \geq c_i\ \  \forall i
+	\sum_j s_jOcc_{ij} \geq c_i\ \  \forall i\label{cons2}
 \end{equation}
 
-Constraint (9) means that if a sentence $j$ is in the summary, then all the bigrams in this sentence would occur in the summary. If sentence $j$ is not in the summary, or bigram $i$ is not in this sentence, this constraint can be always satisfied. Constraint (10) means that if bigram $i$ is in the summary, then at least one sentence in the summary has bigram $i$. Similarly, if bigram $i$ is not in the summary, constraint (10) can be always satisfied as well.
+Constraint (\ref{cons1}) means that if a sentence $j$ is in the summary, then all the bigrams in this sentence would occur in the summary. If sentence $j$ is not in the summary, or bigram $i$ is not in this sentence, this constraint can be always satisfied. Constraint (\ref{cons2}) means that if bigram $i$ is in the summary, then at least one sentence in the summary has bigram $i$. Similarly, if bigram $i$ is not in the summary, constraint (\ref{cons2}) can be always satisfied as well.
 
 Hence, the final ILP problem we established for content realization is:
 
@@ -261,31 +262,32 @@ In our implementation, we also incorporate several sentence compression methods 
 
 \section{Results}
 
-We trained our model on the training dataset and test on the devtest dataset and evaltest dataset. After that, we used the ROUGE script to compare the generated summaries and the human summaries (as gold standard). comp is the parameter we are using for content selection part, meaning the ratio of sentences we select for next steps. 
+We trained our model on the training dataset and test on the devtest dataset and evaltest dataset. After that, we used the ROUGE script to compare the generated summaries and the human summaries (as gold standard). comp is the parameter we are using for content selection part, meaning the ratio of sentences we select for next steps. Due to the randomness of ILP solver, we conducted 5 runs for each dataset. Average ROUGE scores for devtest and evaltest datasets are shown in table \ref{tab:1} and table \ref{tab:2}.\\
 \begin{table}[!ht]
 \centering
-\caption{ROUGE Results for devtest (comp=0.1)}
+\caption{Average ROUGE Results for devtest (comp=0.1)}\label{tab:1}
 \begin{tabular}{|l|l|l|l|}
 \hline
 ROUGE   & Recall  & Precision & F-score \\ \hline
-ROUGE-1 & 0.25985 & 0.28427   & 0.27114 \\ \hline
-ROUGE-2 & 0.07090 & 0.07820   & 0.07428 \\ \hline
-ROUGE-3 & 0.02435 & 0.02695   & 0.02556 \\ \hline
-ROUGE-4 & 0.00946 & 0.01051   & 0.00994 \\ \hline
+ROUGE-1 & 0.25908 & 0.28323   & 0.27023 \\ \hline
+ROUGE-2 & 0.07042 & 0.07760   & 0.07374 \\ \hline
+ROUGE-3 & 0.02342 & 0.02590   & 0.02457 \\ \hline
+ROUGE-4 & 0.00851 & 0.00949   & 0.00896 \\ \hline
 \end{tabular}
 \end{table}
 \begin{table}[!ht]
 \centering
-\caption{ROUGE Results for evaltest (comp=0.1)}
+\caption{Average ROUGE Results for evaltest (comp=0.1)}\label{tab:2}
 \begin{tabular}{|l|l|l|l|}
 \hline
 ROUGE   & Recall  & Precision & F-score \\ \hline
-ROUGE-1 & 0.28090 & 0.30808   & 0.29300 \\ \hline
-ROUGE-2 & 0.07803 & 0.08579   & 0.08144 \\ \hline
-ROUGE-3 & 0.02898 & 0.03175   & 0.03019 \\ \hline
-ROUGE-4 & 0.01467 & 0.01591   & 0.01521 \\ \hline
+ROUGE-1 & 0.27683 & 0.30468   & 0.28923 \\ \hline
+ROUGE-2 & 0.07404 & 0.08163   & 0.07738 \\ \hline
+ROUGE-3 & 0.02641 & 0.02897   & 0.02753 \\ \hline
+ROUGE-4 & 0.01281 & 0.01390   & 0.01329 \\ \hline
 \end{tabular}
-\end{table}
+\end{table}\\
+\indent
 Also, we tried to use a high comp rate for test, which means reserving more sentences during the selection part for information ordering and realization. Although the program running time is very long (more than 24 hours), the results show a very strong improvement.\\
 \begin{table}[!ht]
 \centering
@@ -336,7 +338,6 @@ Although the improvements of our current system are significant, there are some 
 Another problem is that this improved system is still primarily extraction-based and does not combine combine different sentences. An abstraction-based system would be more plausible in such task and more similar to the thinking of human beings. We might want to modify our Content Realization part to see if we can build an abstraction-based system in the future.
 \subsection{Error Analysis}
 Our automatic summarization generates summary for the document set D1003A from the devtest dataset, whose title is Giant Panda:\\
-
 ``More than 20 million hectares of forest have been brought under protection and 3.61 million hectares of forest have been planted since 1997 .
 The central and provincial governments have invested 160 million yuan 20 million US dollars ) into panda protection programs since .
 Nature preserve workers in northwest China 's Gansu Province have formulated a rescue plan pandas from food shortage caused by arrow bamboo flowering .
@@ -344,6 +345,7 @@ The nature preserve , occupying about 220,000 hectares has pandas living wild .
 In Sichuan and Shaanxi provinces , two other habitats of pandas , arrow bamboo was found blooming ."\\
 
 In general, we think our summary is relatively understandable and reasonably recapitulative. Compared to the human summaries stored in the model directory, we found our summary has the following problems:
+
 \begin{itemize}  
 \item The sentences we extracted and compressed from the documents are all topic-related and clustered around select words. However, these sentences do not concur with the human summaries, which means there exists better content selection results for this document set. We may use the topic information to create a better selection.
 \item The human summary focused on a more broad topic. For example, it introduces practices and methods offered by the whole Chinese government but our summaries focused on specific local governments' measures.
@@ -430,8 +432,118 @@ Lu~Wang, Hema~Raghavan, Vittorio~Castelli, Radu~Florian and Claire~Cardie
 
 \end{thebibliography}
 
+\section*{Appendix A\ \ \ \  Experiment Results}
+\begin{table}[!ht]
+\centering
+\caption*{ROUGE-1 scores for devtest (comp=0.1)}
+\begin{tabular}{|l|l|l|l|}
+\hline
+Run   & Recall  & Precision & F-score \\ \hline
+1 & 0.25985 & 0.28427   & 0.27114 \\ \hline
+2 & 0.25729 & 0.27961   & 0.26761 \\ \hline
+3 & 0.26038 & 0.28588   & 0.27218 \\ \hline
+4 & 0.25712 & 0.28149   & 0.26836 \\ \hline
+5 & 0.26075 & 0.28490   & 0.27186 \\ \hline
+\end{tabular}
+\end{table}
 
+\begin{table}[!ht]
+\centering
+\caption*{ROUGE-2 scores for devtest (comp=0.1)}
+\begin{tabular}{|l|l|l|l|}
+\hline
+Run   & Recall  & Precision & F-score \\ \hline
+1 & 0.07090 & 0.07820   & 0.07428 \\ \hline
+2 & 0.06869 & 0.07515   & 0.07169 \\ \hline
+3 & 0.07090 & 0.07853   & 0.07443 \\ \hline
+4 & 0.06982 & 0.07715   & 0.07319 \\ \hline
+5 & 0.07180 & 0.07895   & 0.07509 \\ \hline
+\end{tabular}
+\end{table}
 
+\begin{table}[!ht]
+\centering
+\caption*{ROUGE-3 scores for devtest (comp=0.1)}
+\begin{tabular}{|l|l|l|l|}
+\hline
+Run   & Recall  & Precision & F-score \\ \hline
+1 & 0.02435 & 0.02695   & 0.02556 \\ \hline
+2 & 0.02254 & 0.02475   & 0.02357 \\ \hline
+3 & 0.02352 & 0.02612   & 0.02473 \\ \hline
+4 & 0.02288 & 0.02548   & 0.02408 \\ \hline
+5 & 0.02380 & 0.02618   & 0.02491 \\ \hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!ht]
+\centering
+\caption*{ROUGE-4 scores for devtest (comp=0.1)}
+\begin{tabular}{|l|l|l|l|}
+\hline
+Run   & Recall  & Precision & F-score \\ \hline
+1 & 0.00946 & 0.01051   & 0.00994 \\ \hline
+2 & 0.00783 & 0.00869   & 0.00823 \\ \hline
+3 & 0.00841 & 0.00938   & 0.00886 \\ \hline
+4 & 0.00830 & 0.00938   & 0.00879 \\ \hline
+5 & 0.00856 & 0.00947   & 0.00898 \\ \hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!ht]
+\centering
+\caption*{ROUGE-1 scores for evaltest (comp=0.1)}
+\begin{tabular}{|l|l|l|l|}
+\hline
+Run   & Recall  & Precision & F-score \\ \hline
+1 & 0.27646 & 0.30311   & 0.28835 \\ \hline
+2 & 0.28090 & 0.30808   & 0.29300 \\ \hline
+3 & 0.27827 & 0.30624   & 0.29065 \\ \hline
+4 & 0.27324 & 0.30199   & 0.28602 \\ \hline
+5 & 0.27530 & 0.30397   & 0.28814 \\ \hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!ht]
+\centering
+\caption*{ROUGE-2 scores for evaltest (comp=0.1)}
+\begin{tabular}{|l|l|l|l|}
+\hline
+Run   & Recall  & Precision & F-score \\ \hline
+1 & 0.07374 & 0.08121   & 0.07702 \\ \hline
+2 & 0.07803 & 0.08579   & 0.08144 \\ \hline
+3 & 0.07494 & 0.08264   & 0.07831 \\ \hline
+4 & 0.07073 & 0.07828   & 0.07404 \\ \hline
+5 & 0.07275 & 0.08022   & 0.07607 \\ \hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!ht]
+\centering
+\caption*{ROUGE-3 scores for evaltest (comp=0.1)}
+\begin{tabular}{|l|l|l|l|}
+\hline
+Run   & Recall  & Precision & F-score \\ \hline
+1 & 0.02610 & 0.02865   & 0.02721 \\ \hline
+2 & 0.02898 & 0.03175   & 0.03019 \\ \hline
+3 & 0.02659 & 0.02917   & 0.02771 \\ \hline
+4 & 0.02511 & 0.02763   & 0.02621 \\ \hline
+5 & 0.02528 & 0.02766   & 0.02633 \\ \hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption*{ROUGE-4 scores for evaltest (comp=0.1)}
+\begin{tabular}{|l|l|l|l|}
+\hline
+Run   & Recall  & Precision & F-score \\ \hline
+1 & 0.01249 & 0.01357   & 0.01296 \\ \hline
+2 & 0.01467 & 0.01591   & 0.01521 \\ \hline
+3 & 0.01282 & 0.01392   & 0.01330 \\ \hline
+4 & 0.01210 & 0.01317   & 0.01257 \\ \hline
+5 & 0.01196 & 0.01293   & 0.01239 \\ \hline
+\end{tabular}
+\end{table}
 
 \end{document}
 
