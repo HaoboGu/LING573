@@ -273,9 +273,6 @@ ROUGE-2 & 0.07090 & 0.07820   & 0.07428 \\ \hline
 ROUGE-3 & 0.02435 & 0.02695   & 0.02556 \\ \hline
 ROUGE-4 & 0.00946 & 0.01051   & 0.00994 \\ \hline
 \end{tabular}
-\end{table}
-\begin{table}[!ht]
-\centering
 \caption{ROUGE Results for evaltest (comp=0.1)}
 \begin{tabular}{|l|l|l|l|}
 \hline
@@ -286,7 +283,7 @@ ROUGE-3 & 0.02898 & 0.03175   & 0.03019 \\ \hline
 ROUGE-4 & 0.01467 & 0.01591   & 0.01521 \\ \hline
 \end{tabular}
 \end{table}
-Also, we tried to use a high comp rate for test, which means reserving more sentences during the selection part for information ordering and realization. Although the program running time is very long (more than 24 hours), the results show a very strong improvement.\\
+Also, we tried to use a high comp rate for test, which means reserving more sentences during the selection part for information ordering and realization. Although the program running time is very long (more than 24 hours), the results show a very strong improvement.
 \begin{table}[!ht]
 \centering
 \caption{ROUGE Results for devtest (comp=0.8)}
@@ -298,9 +295,6 @@ ROUGE-2 & 0.08302 & 0.08615   & 0.08438 \\ \hline
 ROUGE-3 & 0.03072 & 0.03163   & 0.03110 \\ \hline
 ROUGE-4 & 0.01252 & 0.01267   & 0.01257 \\ \hline
 \end{tabular}
-\end{table}
-\begin{table}[!ht]
-\centering
 \caption{ROUGE Results for evaltest (comp=0.8)}
 \begin{tabular}{|l|l|l|l|}
 \hline
@@ -311,23 +305,19 @@ ROUGE-3 & 0.03314 & 0.03792   & 0.03524 \\ \hline
 ROUGE-4 & 0.01579 & 0.01808   & 0.01679 \\ \hline
 \end{tabular}
 \end{table}\\
-
-\indent
 Our improved system performs far better than our baseline system and previous D3 system, in all ROUGE aspects. The improvement rates are shown below:
-\begin{figure}[h]
+\begin{figure}[!ht]
 \begin{center}
-%\includegraphics[width=0.45\textwidth]{perc_d4.png}
+\includegraphics[width=0.33\textwidth]{perc_d4.png}
 \caption{Improvement over Deliverable 3}
 \end{center}
 \end{figure}
-\begin{figure}[h]
+\begin{figure}[!ht]
 \begin{center}
-%\includegraphics[width=0.45\textwidth]{perc_d4_2.png}
+\includegraphics[width=0.33\textwidth]{perc_d4_2.png}
 \caption{Improvement over Deliverable 3}
 \end{center}
 \end{figure}
-
-
 \section{Discussion}
 Based on the improvement chart above, our system improves significantly in all ROUGE standards. 
 \subsection{Results Discussion}
@@ -434,5 +424,6 @@ Lu~Wang, Hema~Raghavan, Vittorio~Castelli, Radu~Florian and Claire~Cardie
 
 
 \end{document}
+
 
 
