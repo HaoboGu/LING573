@@ -1,18 +1,3 @@
-%
-% File acl2014.tex
-%
-% Contact: koller@ling.uni-potsdam.de, yusuke@nii.ac.jp
-%%
-%% Based on the style files for ACL-2013, which were, in turn,
-%% Based on the style files for ACL-2012, which were, in turn,
-%% based on the style files for ACL-2011, which were, in turn, 
-%% based on the style files for ACL-2010, which were, in turn, 
-%% based on the style files for ACL-IJCNLP-2009, which were, in turn,
-%% based on the style files for EACL-2009 and IJCNLP-2008...
-
-%% Based on the style files for EACL 2006 by 
-%%e.agirre@ehu.es or Sergi.Balari@uab.es
-%% and that of ACL 08 by Joakim Nivre and Noah Smith
 
 \documentclass[11pt]{article}
 \usepackage{acl2014}
@@ -93,7 +78,7 @@ Previously we have tried to use rule-based trimmer compression during the conten
 \indent
 In the feature selection stage, I decided to apply a subset of features used by Wang in his paper, including the word itself, the last 3 letters, the last 2 letters, if it is a stop word, if it is a negative word, its part-of-speech tag and the same information for previous word and next word. I did not use semantic and syntactic features because many of our sentences from the documents are relatively short and some sentences are splitting into two small sentences in some weird ways, which would significantly increase the error rate for parsing and disambiguation.\\
 \indent
-We want to classify the tokens into 3 labels, O: to be compressed, B: beginning of uncompressed word, I: Inside the uncompressed word. Based on Wang's paper, I used Conditional Random Field algorithm to train my model. I set the L1 penalty coefficient to be 0.1 and L2 penalty coefficient to be 0.2. Also, I set the max iterations to be 500 to avoid over-fitting. The compression results look good as the compression process successfully remove the unnecessary information for summary, including appositives, location information, and time information.  
+We want to classify the tokens into 3 labels, O: to be compressed, B: beginning of uncompressed word, I: Inside the uncompressed word. Based on Wang's paper, I used Conditional Random Field algorithm to train my model. I set the L1 penalty coefficient to be 0.1 and L2 penalty coefficient to be 0.01. Also, we set the max iterations to be 500 to avoid over-fitting. The compression results look good as the compression process successfully remove the unnecessary information for summary, including appositives, location information, and time information.  
 \subsubsection{Scoring}
 Initially, we considered using the method of Log Likelihood Ratio (LLR) and Hidden Markov Model (HMM) to predict if the sentence should be included in the summary based on John Conroy's paper (2004). The paper uses LLR as the HMM feature, and calculates the in-topic frequency and out-topic frequency for each word. In order to make a meaningful training, the training corpus' topics should be at least partially consistent with the test corpus. Unfortunately, the dataset we are using has different distribution of topics in the test and training corpus. \\
 \indent
@@ -232,7 +217,6 @@ In our implementation, we also incorporate several sentence compression methods 
 \section{Results}
 
 We trained our model on the training dataset and test on the devtest dataset and evaltest dataset. After that, we used the ROUGE script to compare the generated summaries and the human summaries (as gold standard). comp is the parameter we are using for content selection part, meaning the ratio of sentences we select for next steps. 
-
 \begin{table}[!ht]
 \centering
 \caption{ROUGE Results for devtest (comp=0.1)}
@@ -245,7 +229,6 @@ ROUGE-3 & 0.02435 & 0.02695   & 0.02556 \\ \hline
 ROUGE-4 & 0.00946 & 0.01051   & 0.00994 \\ \hline
 \end{tabular}
 \end{table}
-
 \begin{table}[!ht]
 \centering
 \caption{ROUGE Results for evaltest (comp=0.1)}
@@ -258,7 +241,6 @@ ROUGE-3 & 0.02898 & 0.03175   & 0.03019 \\ \hline
 ROUGE-4 & 0.01467 & 0.01591   & 0.01521 \\ \hline
 \end{tabular}
 \end{table}
-
 Also, we tried to use a high comp rate for test, which means reserving more sentences during the selection part for information ordering and realization. Although the program running time is very long (more than 24 hours), the results show a very strong improvement.\\
 \begin{table}[!ht]
 \centering
@@ -271,7 +253,7 @@ ROUGE-2 & 0.08302 & 0.08615   & 0.08438 \\ \hline
 ROUGE-3 & 0.03072 & 0.03163   & 0.03110 \\ \hline
 ROUGE-4 & 0.01252 & 0.01267   & 0.01257 \\ \hline
 \end{tabular}
-\end{table}\\
+\end{table}
 \begin{table}[!ht]
 \centering
 \caption{ROUGE Results for evaltest (comp=0.8)}
@@ -286,7 +268,7 @@ ROUGE-4 & 0.01579 & 0.01808   & 0.01679 \\ \hline
 \end{table}\\
 
 \indent
-Our improved system performs far better than our original system, except the Rouge-1 Recall score. The improvement rate is shown below:
+Our improved system performs far better than our baseline system and previous D3 system, in all ROUGE aspects. The improvement rates are shown below:
 \begin{center}
 \includegraphics[width=0.45\textwidth]{perc_d4.png}
 \end{center}
@@ -294,17 +276,47 @@ Our improved system performs far better than our original system, except the Rou
 \includegraphics[width=0.45\textwidth]{perc_d4_2.png}
 \end{center}
 \section{Discussion}
-Based on the improvement chart above, our system improves significantly in Rouge-4 and Rouge-3 standards. However, it does not improve that much in Rouge-1 standard. \\
+Based on the improvement chart above, our system improves significantly in all ROUGE standards. 
+\subsection{Results Discussion}
+Although the improvements of our current system are significant, there are some system flaws that we currently cannot solve. The first problem is that for each time of summarization generation, our system would generate slightly different summaries for a small subset of the test dataset, resulting in a small fluctuation of the ROUGE scores. The problem resulted from the ILP algorithm we used in the Content Realization module. On some occasions, there might be more than 1 solution for the optimization problem and the system would randomly select one optimal sentence for construction. Originally we tried to choose a pseudo-random fixed sentence, but we realize that would not help improve our system performance and decided to keep the small fluctuation in the system.
 \indent
-Although the improvements of our current system are significant, there are some system flaws that we currently cannot solve. The first problem is that for each time of summarization generation, our system would generate slightly different summaries for a small subset of the test dataset, resulting in a small fluctuation of the ROUGE scores. The problem resulted from the ILP algorithm we used in the Content Realization module. On some occasions, there might be more than 1 solution for the optimization problem and the system would randomly select one optimal sentence for construction. We expect to solve the randomness problem when we improve the Content Realization part.
-\indent
-Another problem is that this improved system is still extraction-based and does not modify sentence content or combine different sentences. An abstraction-based system would be more plausible in such task and more similar to the thinking of human beings. We might want to modify our Content Realization part to see if we can build an abstraction-based system.
+Another problem is that this improved system is still primarily extraction-based and does not combine combine different sentences. An abstraction-based system would be more plausible in such task and more similar to the thinking of human beings. We might want to modify our Content Realization part to see if we can build an abstraction-based system in the future.
+\subsection{Error Analysis}
+Our automatic summarization generates summary for the document set D1003A from the devtest dataset, whose title is Giant Panda:\\
+
+``More than 20 million hectares of forest have been brought under protection and 3.61 million hectares of forest have been planted since 1997 .
+The central and provincial governments have invested 160 million yuan 20 million US dollars ) into panda protection programs since .
+Nature preserve workers in northwest China 's Gansu Province have formulated a rescue plan pandas from food shortage caused by arrow bamboo flowering .
+The nature preserve , occupying about 220,000 hectares has pandas living wild .
+In Sichuan and Shaanxi provinces , two other habitats of pandas , arrow bamboo was found blooming ."\\
+
+In general, we think our summary is relatively understandable and reasonably recapitulative. Compared to the human summaries stored in the model directory, we found our summary has the following problems:
+\begin{itemize}  
+\item The sentences we extracted and compressed from the documents are all topic-related and clustered around select words. However, these sentences do not concur with the human summaries, which means there exists better content selection results for this document set. We may use the topic information to create a better selection.
+\item The human summary focused on a more broad topic. For example, it introduces practices and methods offered by the whole Chinese government but our summaries focused on specific local governments' measures.
+\item The order of our extracted sentences is not coherent enough for a streamline understanding. The first sentence and the second sentence should be swapped at least.
+\end{itemize}
+
+The following summary is generated by our system based on the document set D1138A from the evaltest dataset. This summary has the lowest ROUGE-1 score in our deliverable:\\
+
+``They to post travel advisories warning China may have been harvested from unwilling donors ; asked states to cease offering follow-up care to patients who had shady organ transplants in China ; and called on foreign doctors to cut ties with their Chinese counterparts suspected of practices .
+near death , I 've been forced to face intense , unexpected decisions donations .
+At a first-of-its-kind meeting March , UNOS will take a look at hurdles to improving child organ donation , especially for babies and toddlers .
+lawmakers want legal advice before acting for inmates who donate ."\\
+
+Admittedly, this summary practice is not successful in providing a shortened understandable texts summarizing the document set. Compared to the human summaries available, we found the following problems:
+\begin{itemize}
+\item The first sentence contains a pronoun ``they" but it does not have any antecedent so that readers have no idea what/who the pronoun refers to. We might add a coreference resolution part into our system.
+\item The second sentence, which has been compressed and extracted from an interview, should not be included in the final summary.
+\item The order of sentences does not provide a meaningful reading sequence to the readers and we found this problem prevalent on politics topic.
+\end{itemize}
+
 
 \section{Conclusion}
 
-We employed both unsupervised and supervised models in this improved system. The Content Selection part combines LexRank model with KL divergence to calculate the sentence scores. The Information Ordering part uses a modified version of experts method to sort the sentences and the Content Realization part uses ILP to generate the final summary. \\
+We employed both unsupervised and supervised models in this improved system. We add the compression part to eliminate unnecessary information from our extracted sentences. The Content Selection part utilizes word count feature vectors and tf-idf, combines LexRank model with KL divergence to calculate the sentence scores. The Information Ordering part uses a modified version of experts method to sort the sentences and the Content Realization part uses ILP to generate the final summary. \\
 \indent
-Our improved automatic summarization system performs significantly better than our baseline system, especially for longer word sequences since the improvements on Rouge-4 and Rouge-3 are more significant. We expect to solve the randomness problem in our next deliverable.
+Our improved automatic summarization system performs significantly better than our baseline system and D3 system, especially for longer word sequences since the improvements on Rouge-4 and Rouge-3 are more significant. Although we are still having several issues, including the fluctuation in results and extraction without combination problems, we are satisfied with the performance of our new improved system.
 
 \begin{thebibliography}{}
 \bibitem[\protect\citename{Bollegala, Okazaki and Ishizuka}2012]{Bollegala:12}
@@ -357,10 +369,17 @@ Sparck Jones, Karen
 \newblock {\em A statistical interpretation of term specificity and its application in retrieval}
 \newblock{Journal of documentation, 28(1): 11-21}
 
+\bibitem[\protect\citename{Wang, Raghavan, Castelli, Florian and Cardie}2013]{Wang:13}
+Lu~Wang, Hema~Raghavan, Vittorio~Castelli, Radu~Florian and Claire~Cardie
+\newblock 2013.
+\newblock {\em A Sentence Compression Based Framework to Query-Focused Multi-Document Summarization}
+\newblock{Proceedings of the 51st Annual Meeting of the Association for Computational Linguistics 2013, 2013:1384-1394}
+
 \end{thebibliography}
 
 
 
 
 \end{document}
+
 
